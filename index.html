@@ -11,14 +11,14 @@
 /* ── KINSAL DESIGN TOKENS ───────────────────────────────────────── */
 :root {
   /* palette — linen/parchment base, dark brown type, blue accent */
-  --bg:        #f5f2ec;   /* warm linen */
-  --bg2:       #ede9e0;   /* slightly deeper parchment */
-  --bg3:       #e4dfd4;   /* pressed linen */
-  --surface:   #faf8f4;   /* card face — lightest warm white */
+  --bg:        #f5f2ec;   
+  --bg2:       #ede9e0;   
+  --bg3:       #e4dfd4;   
+  --surface:   #faf8f4;   
 
-  --ink:       #2c2416;   /* dark brown — headings */
-  --ink2:      #5c5040;   /* mid brown — body */
-  --ink3:      #9c8e7c;   /* warm dust — hints/muted */
+  --ink:       #2c2416;   
+  --ink2:      #5c5040;  
+  --ink3:      #9c8e7c;   
 
   --border:    rgba(44,36,22,0.10);
   --border2:   rgba(44,36,22,0.18);
@@ -45,8 +45,7 @@
   --r3: 16px;
 }
 
-/* ── GRAIN TEXTURE OVERLAY ──────────────────────────────────────── */
-/* SVG noise pattern embedded as data URI — medium intensity */
+
 body::before {
   content: '';
   position: fixed;
@@ -58,7 +57,7 @@ body::before {
   background-size: 180px 180px;
 }
 
-/* second pass — finer grain at lower opacity */
+
 body::after {
   content: '';
   position: fixed;
@@ -140,7 +139,7 @@ body {
 /* ── BUTTONS ────────────────────────────────────────────────────── */
 .btn {
   padding: 8px 18px;
-  /* slightly uneven radii for hand-crafted feel */
+
   border-radius: 9px 8px 10px 8px;
   border: 1px solid var(--border2);
   background: var(--surface);
