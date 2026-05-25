@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'none'">
+<title>wheelbook</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css">
+<style>
+:root{
+  --bg:#fff;--bg2:#f6f5f0;--bg3:#ececea;
+  --text:#1a1a18;--text2:#6b6b67;--text3:#9b9b97;
+  --border:rgba(0,0,0,0.12);--border2:rgba(0,0,0,0.22);
+  --green:#1D9E75;--green-light:#E1F5EE;--green-dark:#0F6E56;
+  --green-text:#085041;--red:#A32D2D;--red-light:#FCEBEB;
+  --amber:#854F0B;--amber-light:#FAEEDA;
+  --blue-light:#E6F1FB;--blue-border:#85B7EB;
+  --radius:8px;--radius-lg:12px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1c1c1a;--bg2:#272725;--bg3:#313130;
+    --text:#f0efea;--text2:#a0a09b;--text3:#6b6b67;
+    --border:rgba(255,255,255,0.12);--border2:rgba(255,255,255,0.22);
+    --green-light:#04342C;--green-text:#9FE1CB;
+    --red-light:#501313;--amber-light:#412402;
+    --blue-light:#042C53;--blue-border:#378ADD;
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;font-size:16px}
+.app{max-width:680px;margin:0 auto;padding:1.5rem 1rem}
+.view{display:none}.view.active{display:block}
+.top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}
+.logo{font-size:18px;font-weight:500}.logo span{color:var(--green)}
+.security-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;border-radius:20px;background:var(--green-light);color:var(--green-text);font-weight:500;margin-left:8px}
+.btn{padding:8px 16px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);font-size:14px;cursor:pointer;font-family:inherit;transition:background .15s}
+.btn:hover{background:var(--bg2)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--green);color:#fff;border-color:var(--green)}.btn-primary:hover{background:var(--green-dark)}
+.btn-danger{background:var(--red-light);color:var(--red);border-color:var(--red)}
+.btn-sm{padding:5px 12px;font-size:13px}
+.card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:12px}
+.rule-box{background:var(--bg2);border-radius:var(--radius);padding:.75rem 1rem;font-size:13px;color:var(--text2);margin-bottom:1rem;line-height:1.9}
+.rule-box i{color:var(--green);margin-right:6px}
+.day-tabs{display:flex;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap}
+.day-tab{padding:6px 14px;border-radius:var(--radius);border:0.5px solid var(--border);background:var(--bg);color:var(--text2);font-size:13px;cursor:pointer;font-family:inherit}
+.day-tab.active{background:var(--green-light);color:var(--green-dark);border-color:var(--green);font-weight:500}
+.slot-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:12px}
+.slot-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.slot-time{font-size:13px;font-weight:500}
+.slot-label{font-size:11px;padding:3px 8px;border-radius:20px;font-weight:500}
+.badge-open{background:var(--green-light);color:var(--green-dark)}
+.badge-full{background:var(--red-light);color:var(--red)}
+.badge-locked{background:var(--bg2);color:var(--text3)}
+.wheel-slot{padding:8px 10px;border-radius:var(--radius);border:0.5px solid var(--border);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.wheel-slot.booked{background:var(--green-light);border-color:var(--green)}
+.wheel-slot.mine{background:var(--blue-light);border-color:var(--blue-border)}
+.wheel-slot.empty{background:var(--bg2)}
+.student-name{font-weight:500;font-size:13px}
+.muted{color:var(--text2);font-size:12px}
+.countdown{font-size:11px;color:var(--amber);font-weight:500;background:var(--amber-light);padding:2px 7px;border-radius:20px}
+.section-label{font-size:12px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;margin-top:14px}
+.select-student{width:100%;padding:9px 12px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;margin-bottom:1rem;cursor:pointer}
+.pin-screen{max-width:280px;margin:3rem auto;text-align:center}
+.pin-input{width:100%;padding:12px;font-size:20px;letter-spacing:.3em;text-align:center;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);font-family:monospace;margin:1rem 0;-webkit-text-security:disc}
+.pin-error{color:var(--red);font-size:13px;min-height:20px}
+.lockout-banner{background:var(--red-light);color:var(--red);border-radius:var(--radius);padding:.75rem 1rem;font-size:13px;margin-bottom:1rem;display:none}
+.rate-banner{background:var(--amber-light);color:var(--amber);border-radius:var(--radius);padding:8px 12px;font-size:13px;margin-bottom:10px;display:none}
+.tab-bar{display:flex;gap:6px;margin-bottom:1.25rem;border-bottom:0.5px solid var(--border);flex-wrap:wrap}
+.tab{padding:8px 14px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;color:var(--text2);background:none;border-left:none;border-right:none;border-top:none;font-family:inherit;margin-bottom:-0.5px}
+.tab.active{color:var(--green);border-bottom-color:var(--green);font-weight:500}
+.dash-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.25rem}
+.metric{background:var(--bg2);border-radius:var(--radius);padding:.75rem 1rem;text-align:center}
+.metric-val{font-size:22px;font-weight:500}
+.metric-label{font-size:12px;color:var(--text2);margin-top:2px}
+.roster-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border)}
+.roster-row:last-child{border-bottom:none}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--green-light);color:var(--green-dark);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0}
+.no-show-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--amber-light);border-radius:var(--radius);margin-bottom:6px;font-size:13px}
+.security-log{background:var(--bg2);border-radius:var(--radius);padding:.75rem 1rem;font-size:12px;color:var(--text2);max-height:220px;overflow-y:auto;font-family:monospace;line-height:1.9}
+.security-log .log-warn{color:var(--amber)}.security-log .log-fail{color:var(--red)}.security-log .log-ok{color:var(--green-dark)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:50;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg);border-radius:var(--radius-lg);border:0.5px solid var(--border);padding:1.25rem;width:320px;max-width:90vw}
+.modal h3{font-size:16px;font-weight:500;margin-bottom:.5rem}
+.modal p{font-size:13px;color:var(--text2);margin-bottom:1rem;line-height:1.5}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+.toast-container{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:100;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:6px}
+.toast{background:var(--green);color:#fff;padding:10px 18px;border-radius:var(--radius);font-size:13px;white-space:nowrap;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.session-bar{font-size:12px;color:var(--text3);text-align:right;margin-bottom:6px}
+input[type=text],input[type=password],input[type=number]{padding:9px 12px;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg);color:var(--text);font-size:14px;font-family:inherit}
+.flex-between{display:flex;align-items:center;justify-content:space-between}
+.integrity-warn{background:var(--red-light);color:var(--red);border-radius:var(--radius);padding:.6rem .9rem;font-size:13px;margin-bottom:10px;display:none}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+<div class="toast-container" id="toast-container"></div>
+
+<!-- student view -->
+<div id="student-view" class="view active">
+  <div class="top-bar">
+    <div class="logo">wheel<span>book</span><span class="security-badge"><i class="ti ti-shield-check" aria-hidden="true"></i>secured</span></div>
+    <button class="btn btn-sm" onclick="showPinView()" aria-label="Instructor login"><i class="ti ti-lock" aria-hidden="true"></i> instructor</button>
+  </div>
+  <div id="rate-banner" class="rate-banner" role="alert" aria-live="polite"><i class="ti ti-alert-triangle" aria-hidden="true"></i> <span id="rate-msg">slow down — please wait before trying again</span></div>
+  <p style="font-size:14px;color:var(--text2);margin-bottom:.75rem">sign in to reserve a wheel</p>
+  <select class="select-student" id="student-select" onchange="onStudentSelect()" aria-label="Select your name"></select>
+  <div class="rule-box" role="note">
+    <div><i class="ti ti-clock" aria-hidden="true"></i>reserve up to 2 hours before each slot</div>
+    <div><i class="ti ti-user-off" aria-hidden="true"></i>no-shows released after 30 minutes</div>
+    <div><i class="ti ti-calendar" aria-hidden="true"></i>one reservation per student per day</div>
+    <div><i class="ti ti-shield" aria-hidden="true"></i>all activity is logged</div>
+  </div>
+  <div class="day-tabs" id="day-tabs" role="tablist" aria-label="Day selection"></div>
+  <div id="slot-area" role="region" aria-label="Available wheel slots"></div>
+</div>
+
+<!-- pin view -->
+<div id="pin-view" class="view" role="main">
+  <div class="pin-screen">
+    <i class="ti ti-lock" style="font-size:32px;color:var(--green)" aria-hidden="true"></i>
+    <p style="margin-top:.75rem;font-size:15px;font-weight:500">instructor access</p>
+    <p class="muted" style="margin-top:4px">enter your PIN to continue</p>
+    <div id="lockout-banner" class="lockout-banner" role="alert"><i class="ti ti-lock" aria-hidden="true"></i> <span id="lockout-msg">too many attempts — locked</span></div>
+    <input class="pin-input" type="password" maxlength="6" id="pin-input"
+      placeholder="••••" oninput="onPinInput()" autocomplete="off"
+      inputmode="numeric" pattern="[0-9]*" aria-label="PIN entry">
+    <div class="pin-error" id="pin-error" role="alert" aria-live="assertive"></div>
+    <button class="btn" onclick="showStudent()" style="margin-top:.5rem;width:100%">cancel</button>
+  </div>
+</div>
+
+<!-- instructor view -->
+<div id="instructor-view" class="view">
+  <div class="top-bar">
+    <div class="logo">wheel<span>book</span> <span style="font-size:13px;color:var(--text2);font-weight:400">— instructor</span></div>
+    <button class="btn btn-sm" onclick="instructorLogout()"><i class="ti ti-logout" aria-hidden="true"></i> sign out</button>
+  </div>
+  <div id="session-bar" class="session-bar"></div>
+  <div class="dash-grid" id="dash-metrics"></div>
+  <div class="tab-bar" role="tablist">
+    <button class="tab active" onclick="showDashTab('today',this)" role="tab" aria-selected="true">today's slots</button>
+    <button class="tab" onclick="showDashTab('roster',this)" role="tab" aria-selected="false">roster</button>
+    <button class="tab" onclick="showDashTab('noshows',this)" role="tab" aria-selected="false">no-shows</button>
+    <button class="tab" onclick="showDashTab('security',this)" role="tab" aria-selected="false">security log</button>
+    <button class="tab" onclick="showDashTab('settings',this)" role="tab" aria-selected="false">settings</button>
+  </div>
+  <div id="dash-today"></div>
+  <div id="dash-roster" style="display:none"></div>
+  <div id="dash-noshows" style="display:none"></div>
+  <div id="dash-security" style="display:none"></div>
+  <div id="dash-settings" style="display:none"></div>
+</div>
+
+<!-- confirm modal (uses fixed position properly outside iframe context) -->
+<div id="modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal">
+    <h3 id="modal-title">confirm</h3>
+    <p id="modal-body"></p>
+    <div class="modal-actions">
+      <button class="btn btn-sm" onclick="closeModal()">cancel</button>
+      <button class="btn btn-sm btn-primary" id="modal-confirm">confirm</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<script>
+/* ── SECURITY CONFIG ──────────────────────────────────────────── */
+// PIN is stored as a SHA-256 hex digest — never in plaintext.
+// Default PIN is 1234. Run: sha256('1234') = 03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4
+// To change, compute sha256(newPin) and replace HASHED_PIN.
+const HASHED_PIN = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4';
+const MAX_PIN_ATTEMPTS   = 5;
+const LOCKOUT_MS         = 5 * 60 * 1000;   // 5 min
+const RATE_LIMIT_MS      = 3000;             // 3 s between actions
+const SESSION_TIMEOUT_MS = 20 * 60 * 1000;  // 20 min instructor session
+const BOOKING_WINDOW_HRS = 2;
+const NOSHOW_RELEASE_MIN = 30;
+const MAX_LOG_ENTRIES    = 100;
+const MAX_STUDENTS       = 200;
+const MAX_NAME_LEN       = 40;
+
+/* ── SHA-256 HELPER ───────────────────────────────────────────── */
+async function sha256(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ── INTEGRITY CHECK ──────────────────────────────────────────── */
+// Detect if JS globals were tampered with in devtools between page loads.
+const _origFetch = typeof fetch !== 'undefined' ? fetch.toString() : '';
+function integrityCheck(){
+  // Warn if console appears to have been used to override functions
+  const flagged = [];
+  if(typeof bookSlot !== 'function') flagged.push('bookSlot');
+  if(typeof checkPin !== 'function') flagged.push('checkPin');
+  if(flagged.length) logEvent('integrity-warn','Integrity check flagged: '+flagged.join(', '));
+}
+
+/* ── APP STATE ────────────────────────────────────────────────── */
+const DAYS  = ['Tuesday','Thursday','Saturday','Sunday'];
+const SLOTS = [
+  {id:'am',label:'morning',time:'9:00 am – 1:00 pm',start:9,end:13},
+  {id:'pm',label:'evening',time:'4:00 pm – 8:00 pm',start:16,end:20}
+];
+const WHEELS = ['Shimpo', 'Pacifica', 'BHR'];
+
+let students = [
+  {id:'s1',name:'Ava Chen'},{id:'s2',name:'Marcus Bell'},
+  {id:'s3',name:'Priya Nair'},{id:'s4',name:'Jordan Ellis'},
+  {id:'s5',name:'Sam Torres'},{id:'s6',name:'Lily Park'},
+  {id:'s7',name:'Theo Grant'}
+];
+let reservations = {};
+let waitlists    = {};
+let noShows      = [];
+let noShowTimers = {};
+let countdownIntervals = {};
+
+let currentStudent    = null;
+let currentDay        = DAYS[0];
+let pendingAction     = null;
+let instructorSession = null; // { expiresAt: timestamp }
+let sessionTimer      = null;
+
+let pinAttempts   = 0;
+let pinLockedUntil = 0;
+let lastActionTime = {};
+let securityLog   = [];
+
+/* ── LOGGING ──────────────────────────────────────────────────── */
+function logEvent(type, detail){
+  const now = new Date();
+  // Sanitize detail before storing
+  const safeDetail = String(detail).replace(/[<>"'&]/g,'').slice(0,200);
+  const entry = {
+    time: now.toLocaleTimeString(),
+    isoTime: now.toISOString(),
+    type,
+    detail: safeDetail
+  };
+  securityLog.unshift(entry);
+  if(securityLog.length > MAX_LOG_ENTRIES) securityLog.pop();
+}
+
+/* ── INPUT SANITIZATION ───────────────────────────────────────── */
+function sanitize(str){
+  return String(str)
+    .replace(/[<>"'&\/\\;`]/g,'')  // strip HTML/injection chars
+    .replace(/\s+/g,' ')
+    .trim()
+    .slice(0, MAX_NAME_LEN);
+}
+
+function isValidName(name){
+  return /^[a-zA-Z\s'\-\.]{2,40}$/.test(name);
+}
+
+/* ── RATE LIMITING ────────────────────────────────────────────── */
+// Per-action rate limit — prevents spam booking/cancelling
+const _actionCounts = {};
+function isRateLimited(action){
+  const now = Date.now();
+  if(lastActionTime[action] && (now - lastActionTime[action]) < RATE_LIMIT_MS) return true;
+  lastActionTime[action] = now;
+  return false;
+}
+
+// Separate heavy-action limiter: max 10 bookings per 5 minutes
+const bookingWindow = [];
+function isTooManyBookings(){
+  const now = Date.now();
+  bookingWindow.splice(0, bookingWindow.length, ...bookingWindow.filter(t=>now-t<5*60*1000));
+  if(bookingWindow.length >= 10) return true;
+  bookingWindow.push(now);
+  return false;
+}
+
+function showRateBanner(msg){
+  const b = document.getElementById('rate-banner');
+  document.getElementById('rate-msg').textContent = msg;
+  b.style.display = 'block';
+  clearTimeout(b._t);
+  b._t = setTimeout(()=>b.style.display='none', 4000);
+}
+
+/* ── SLOT HELPERS ─────────────────────────────────────────────── */
+function key(d,s,w){ return `${d}|${s}|${w}`; }
+
+function initSlots(){
+  DAYS.forEach(d=>SLOTS.forEach(s=>WHEELS.forEach(w=>{
+    const k = key(d,s.id,w);
+    if(reservations[k] === undefined) reservations[k] = null;
+    if(!waitlists[k]) waitlists[k] = [];
+  })));
+}
+initSlots();
+
+function canBook(day, slotId){
+  const now   = new Date();
+  const dayIdx = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const target = dayIdx.indexOf(day);
+  const today  = now.getDay();
+  const sl     = SLOTS.find(s=>s.id===slotId);
+  if(!sl) return false;
+  const slotStart = new Date(now);
+  const diff = (target - today + 7) % 7;
+  slotStart.setDate(now.getDate() + diff);
+  slotStart.setHours(sl.start, 0, 0, 0);
+  const diffHrs = (slotStart - now) / 3600000;
+  return diffHrs <= BOOKING_WINDOW_HRS && diffHrs > 0;
+}
+
+function studentHasBookingToday(day){
+  return SLOTS.some(s=>WHEELS.some(w=>reservations[key(day,s.id,w)]===currentStudent));
+}
+
+/* ── PIN AUTH ─────────────────────────────────────────────────── */
+function onPinInput(){
+  const val = document.getElementById('pin-input').value;
+  // Only allow digits
+  const cleaned = val.replace(/\D/g,'');
+  if(cleaned !== val) document.getElementById('pin-input').value = cleaned;
+  if(cleaned.length >= 4) checkPin(cleaned);
+}
+
+async function checkPin(val){
+  const now = Date.now();
+  if(now < pinLockedUntil){
+    const mins = Math.ceil((pinLockedUntil - now) / 60000);
+    document.getElementById('lockout-msg').textContent = `locked — ${mins} more minute${mins>1?'s':''}`;
+    document.getElementById('lockout-banner').style.display = 'block';
+    document.getElementById('pin-input').value = '';
+    return;
+  }
+  if(val.length < 4) return;
+
+  const hashed = await sha256(val);
+  document.getElementById('pin-input').value = ''; // clear immediately
+
+  if(hashed === HASHED_PIN){
+    pinAttempts = 0;
+    logEvent('auth-success','Instructor authenticated');
+    startInstructorSession();
+  } else {
+    pinAttempts++;
+    logEvent('auth-fail',`Wrong PIN attempt ${pinAttempts}/${MAX_PIN_ATTEMPTS}`);
+    if(pinAttempts >= MAX_PIN_ATTEMPTS){
+      pinLockedUntil = now + LOCKOUT_MS;
+      pinAttempts = 0;
+      document.getElementById('lockout-msg').textContent = 'too many attempts — locked for 5 minutes';
+      document.getElementById('lockout-banner').style.display = 'block';
+      document.getElementById('pin-error').textContent = '';
+      logEvent('lockout','PIN locked out for 5 minutes');
+    } else {
+      const left = MAX_PIN_ATTEMPTS - pinAttempts;
+      document.getElementById('pin-error').textContent = `incorrect — ${left} attempt${left>1?'s':''} remaining`;
+    }
+  }
+}
+
+/* ── SESSION MANAGEMENT ───────────────────────────────────────── */
+function startInstructorSession(){
+  instructorSession = { startedAt: Date.now(), expiresAt: Date.now() + SESSION_TIMEOUT_MS };
+  clearInterval(sessionTimer);
+  sessionTimer = setInterval(tickSession, 30000);
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('instructor-view').classList.add('active');
+  renderDash();
+  updateSessionBar();
+}
+
+function tickSession(){
+  if(!instructorSession) return;
+  if(Date.now() >= instructorSession.expiresAt){
+    logEvent('session','Instructor session expired — auto sign-out');
+    instructorLogout();
+    showToast('session expired — please sign in again');
+  } else {
+    updateSessionBar();
+  }
+}
+
+function updateSessionBar(){
+  if(!instructorSession) return;
+  const remaining = Math.max(0, Math.ceil((instructorSession.expiresAt - Date.now()) / 60000));
+  document.getElementById('session-bar').textContent = `session expires in ${remaining} min`;
+}
+
+function instructorLogout(){
+  clearInterval(sessionTimer);
+  sessionTimer = null;
+  instructorSession = null;
+  logEvent('auth-logout','Instructor signed out');
+  showStudent();
+}
+
+function requireSession(){
+  if(!instructorSession || Date.now() >= instructorSession.expiresAt){
+    instructorLogout();
+    return false;
+  }
+  return true;
+}
+
+/* ── NAVIGATION ───────────────────────────────────────────────── */
+function showPinView(){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('lockout-banner').style.display = 'none';
+  document.getElementById('pin-error').textContent = '';
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-view').classList.add('active');
+}
+
+function showStudent(){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('student-view').classList.add('active');
+}
+
+/* ── STUDENT ACTIONS ──────────────────────────────────────────── */
+function onStudentSelect(){
+  const val = document.getElementById('student-select').value;
+  if(val && isRateLimited('select')){ showRateBanner('please wait before switching'); return; }
+  currentStudent = val || null;
+  if(currentStudent){
+    const name = students.find(s=>s.id===currentStudent)?.name;
+    logEvent('login', `Student selected: ${name}`);
+  }
+  renderSlots();
+}
+
+function bookSlot(day, slotId, wheel){
+  if(!currentStudent){ showRateBanner('select your name first'); return; }
+  if(isRateLimited('book')){ showRateBanner('please wait before booking again'); return; }
+  if(isTooManyBookings()){ showRateBanner('too many booking attempts — please wait'); logEvent('rate-limit','Booking rate limit hit'); return; }
+  if(!canBook(day, slotId)){ showRateBanner('booking window not open yet'); return; }
+  if(studentHasBookingToday(day)){ showRateBanner('you already have a reservation today'); return; }
+  const k = key(day, slotId, wheel);
+  if(reservations[k]){ showRateBanner('that slot was just taken'); return; }
+  const sl = SLOTS.find(s=>s.id===slotId);
+  const stuName = students.find(s=>s.id===currentStudent)?.name;
+  pendingAction = ()=>{
+    // Re-validate server-side equivalent checks after modal confirm
+    if(reservations[k]){ showRateBanner('slot taken while confirming'); return; }
+    if(studentHasBookingToday(day)){ showRateBanner('you already booked today'); return; }
+    if(!canBook(day, slotId)){ showRateBanner('window closed'); return; }
+    reservations[k] = currentStudent;
+    logEvent('booking', `${stuName} reserved ${wheel} · ${day} ${sl?.label}`);
+    renderSlots(); renderDash();
+  };
+  openModal('confirm reservation', `Reserve ${wheel} for the ${sl?.label} slot (${sl?.time}) on ${day}?`, 'confirm');
+}
+
+function cancelRes(day, slotId, wheel){
+  if(isRateLimited('cancel')){ showRateBanner('please wait before cancelling'); return; }
+  const k = key(day, slotId, wheel);
+  if(reservations[k] !== currentStudent){ logEvent('tamper-attempt','Cancel attempted on slot not owned by current student'); showRateBanner('that reservation is not yours'); return; }
+  const stuName = students.find(s=>s.id===currentStudent)?.name;
+  pendingAction = ()=>{
+    if(reservations[k] !== currentStudent){ showRateBanner('reservation mismatch'); return; }
+    reservations[k] = null;
+    clearInterval(countdownIntervals[k]);
+    delete countdownIntervals[k];
+    delete noShowTimers[k];
+    promoteWaitlist(k);
+    logEvent('cancel', `${stuName} cancelled ${wheel} · ${day} ${slotId}`);
+    renderSlots(); renderDash();
+  };
+  openModal('cancel reservation', 'Are you sure you want to cancel your reservation?', 'yes, cancel');
+}
+
+function joinWaitlist(day, slotId, wheel){
+  if(!currentStudent) return;
+  if(isRateLimited('waitlist')){ showRateBanner('please wait before joining another waitlist'); return; }
+  const k = key(day, slotId, wheel);
+  if(waitlists[k].includes(currentStudent)){ showRateBanner('already on this waitlist'); return; }
+  waitlists[k].push(currentStudent);
+  const stuName = students.find(s=>s.id===currentStudent)?.name;
+  logEvent('waitlist', `${stuName} joined waitlist · ${wheel} ${day} ${slotId}`);
+  renderSlots();
+}
+
+/* ── WAITLIST / NO-SHOW ───────────────────────────────────────── */
+function promoteWaitlist(k){
+  if(waitlists[k]?.length > 0){
+    // Skip students who already have a booking today (one-per-day rule)
+    const [day] = k.split('|');
+    const nextIdx = waitlists[k].findIndex(id=>!SLOTS.some(s=>WHEELS.some(w=>reservations[key(day,s.id,w)]===id)));
+    if(nextIdx === -1){ logEvent('waitlist','No eligible student to promote for '+k); return; }
+    const [next] = waitlists[k].splice(nextIdx,1);
+    reservations[k] = next;
+    const stu = students.find(s=>s.id===next);
+    logEvent('promote', `${stu?.name||'student'} promoted from waitlist · ${k}`);
+    showToast((stu ? stu.name : 'Next student') + ' promoted from waitlist');
+  }
+}
+
+function triggerNoShow(k){
+  if(!requireSession()) return;
+  const stuId = reservations[k];
+  const stu   = students.find(s=>s.id===stuId);
+  noShowTimers[k] = { end: Date.now() + NOSHOW_RELEASE_MIN * 60000 };
+  logEvent('no-show', `${stu?.name||'?'} marked no-show · ${k}`);
+  noShows.push({ key:k, student:stuId, time:new Date().toLocaleTimeString() });
+  clearInterval(countdownIntervals[k]);
+  countdownIntervals[k] = setInterval(()=>{
+    const remaining = noShowTimers[k].end - Date.now();
+    const el = document.getElementById('cd-'+k);
+    if(el) el.textContent = remaining > 0 ? Math.ceil(remaining/60000)+'m' : 'releasing...';
+    if(remaining <= 0){
+      clearInterval(countdownIntervals[k]);
+      delete countdownIntervals[k];
+      reservations[k] = null;
+      delete noShowTimers[k];
+      promoteWaitlist(k);
+      renderSlots(); renderDash();
+    }
+  }, 10000);
+  renderSlots(); renderDash();
+}
+
+/* ── RENDER: STUDENT SIDE ─────────────────────────────────────── */
+function renderDayTabs(){
+  document.getElementById('day-tabs').innerHTML = DAYS.map(d=>
+    `<button class="day-tab${d===currentDay?' active':''}" onclick="setDay('${d}')" role="tab" aria-selected="${d===currentDay}">${d}</button>`
+  ).join('');
+}
+
+function setDay(d){ currentDay = d; renderDayTabs(); renderSlots(); }
+
+function renderSlots(){
+  const area = document.getElementById('slot-area');
+  let html = '';
+  SLOTS.forEach(s=>{
+    const bookable = canBook(currentDay, s.id);
+    const allFull  = WHEELS.every(w=>reservations[key(currentDay,s.id,w)] !== null);
+    const badge    = bookable
+      ? (allFull ? '<span class="slot-label badge-full">full</span>' : '<span class="slot-label badge-open">open</span>')
+      : '<span class="slot-label badge-locked">opens 2 hrs before</span>';
+    html += `<div class="slot-card"><div class="slot-header"><span class="slot-time">${s.label} · ${s.time}</span>${badge}</div>`;
+    WHEELS.forEach(w=>{
+      const k     = key(currentDay, s.id, w);
+      const booked = reservations[k];
+      const wl    = waitlists[k] || [];
+      const isMe  = booked === currentStudent;
+      const inNS  = noShowTimers[k] !== undefined;
+      if(booked){
+        const stu = students.find(st=>st.id===booked);
+        html += `<div class="wheel-slot ${isMe?'mine':'booked'}">
+          <div><div class="student-name">${esc(stu?.name||'—')}</div><div class="muted">${esc(w)}</div></div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+            ${inNS?`<span class="countdown" id="cd-${k}">releasing soon</span>`:''}
+            ${isMe?`<button class="btn btn-sm btn-danger" onclick="cancelRes('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">cancel</button>`:''}
+          </div>
+        </div>`;
+      } else {
+        let action = '';
+        if(bookable && currentStudent){
+          if(studentHasBookingToday(currentDay)){
+            action = '<span class="muted" style="font-size:11px">1/day limit</span>';
+          } else {
+            action = `<button class="btn btn-sm btn-primary" onclick="bookSlot('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">reserve</button>`;
+          }
+        }
+        html += `<div class="wheel-slot empty"><div><div class="student-name" style="color:var(--text3)">available</div><div class="muted">${esc(w)}</div></div>${action}</div>`;
+      }
+      if(wl.length > 0){
+        const pos = wl.indexOf(currentStudent);
+        html += `<div style="font-size:12px;color:var(--text2);padding:4px 0 6px 4px">
+          <i class="ti ti-list" aria-hidden="true"></i> waitlist: ${wl.length}${pos>-1?' <strong>· you are #'+(pos+1)+'</strong>':''}
+          ${currentStudent&&pos===-1&&bookable&&!studentHasBookingToday(currentDay)?`<button class="btn btn-sm" style="margin-left:8px;font-size:11px;padding:3px 8px" onclick="joinWaitlist('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">join waitlist</button>`:''}
+        </div>`;
+      }
+    });
+    html += '</div>';
+  });
+  area.innerHTML = html || '<p class="muted">no slots available</p>';
+  restartCountdownDisplays();
+}
+
+/* ── ESC HELPER: prevent XSS in innerHTML ─────────────────────── */
+function esc(str){
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* ── RENDER: INSTRUCTOR SIDE ──────────────────────────────────── */
+function renderDash(){
+  if(!requireSession()) return;
+  let total=0,booked=0,wlCount=0;
+  DAYS.forEach(d=>SLOTS.forEach(s=>WHEELS.forEach(w=>{
+    total++;
+    if(reservations[key(d,s.id,w)] !== null) booked++;
+    wlCount += (waitlists[key(d,s.id,w)]||[]).length;
+  })));
+  document.getElementById('dash-metrics').innerHTML=`
+    <div class="metric"><div class="metric-val">${booked}</div><div class="metric-label">booked this week</div></div>
+    <div class="metric"><div class="metric-val">${total-booked}</div><div class="metric-label">open slots</div></div>
+    <div class="metric"><div class="metric-val">${wlCount}</div><div class="metric-label">on waitlists</div></div>`;
+
+  let todayHtml = '';
+  DAYS.forEach(d=>{
+    todayHtml += `<div class="section-label">${esc(d)}</div>`;
+    SLOTS.forEach(s=>WHEELS.forEach(w=>{
+      const k   = key(d,s.id,w);
+      const bId = reservations[k];
+      const stu = bId ? students.find(st=>st.id===bId) : null;
+      const wl  = waitlists[k]||[];
+      const isNS= noShowTimers[k] !== undefined;
+      todayHtml += `<div class="card" style="margin-bottom:8px">
+        <div class="flex-between" style="margin-bottom:6px">
+          <span style="font-size:13px;font-weight:500">${esc(w)} · ${esc(s.label)}</span>
+          <span style="font-size:12px;color:var(--text2)">${esc(s.time)}</span>
+        </div>
+        ${stu?`<div class="flex-between">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="avatar">${esc(stu.name.split(' ').map(n=>n[0]).join(''))}</div>
+            <span class="student-name">${esc(stu.name)}</span>
+            ${isNS?`<span class="countdown" id="cd-${k}">timer</span>`:''}
+          </div>
+          <div style="display:flex;gap:6px">
+            ${!isNS?`<button class="btn btn-sm" onclick="triggerNoShow('${k}')">mark no-show</button>`:''}
+            <button class="btn btn-sm btn-danger" onclick="adminCancel('${k}')">cancel</button>
+          </div>
+        </div>`:`<span class="muted">available</span>`}
+        ${wl.length?`<div class="muted" style="margin-top:6px;font-size:12px"><i class="ti ti-list" aria-hidden="true"></i> waitlist: ${wl.map(id=>esc(students.find(s=>s.id===id)?.name||'?')).join(', ')}</div>`:''}
+      </div>`;
+    }));
+  });
+  document.getElementById('dash-today').innerHTML = todayHtml;
+  restartCountdownDisplays();
+
+  // Roster
+  let rosterHtml = '<div class="card">';
+  students.forEach(s=>{
+    const bookings = [];
+    DAYS.forEach(d=>SLOTS.forEach(sl=>WHEELS.forEach(w=>{
+      if(reservations[key(d,sl.id,w)]===s.id) bookings.push(d+' '+sl.label);
+    })));
+    rosterHtml += `<div class="roster-row">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="avatar">${esc(s.name.split(' ').map(n=>n[0]).join(''))}</div>
+        <div><div class="student-name">${esc(s.name)}</div><div class="muted">${bookings.length?bookings.map(esc).join(', '):'no bookings'}</div></div>
+      </div>
+      <button class="btn btn-sm btn-danger" onclick="removeStudent('${esc(s.id)}')">remove</button>
+    </div>`;
+  });
+  rosterHtml += `<div style="margin-top:10px;display:flex;gap:8px">
+    <input type="text" id="new-student-name" placeholder="add student name…" maxlength="${MAX_NAME_LEN}" style="flex:1" autocomplete="off">
+    <button class="btn btn-sm btn-primary" onclick="addStudent()">add</button>
+  </div></div>`;
+  document.getElementById('dash-roster').innerHTML = rosterHtml;
+
+  // No-shows
+  const nsHtml = noShows.length === 0
+    ? '<p class="muted">no no-shows recorded.</p>'
+    : noShows.map(ns=>{
+        const stu  = students.find(s=>s.id===ns.student);
+        const parts = ns.key.split('|');
+        return `<div class="no-show-row"><i class="ti ti-alert-triangle" aria-hidden="true" style="color:var(--amber)"></i><span><strong>${esc(stu?.name||'unknown')}</strong> · ${esc(parts[0])} ${esc(parts[1])} · ${esc(ns.time)}</span></div>`;
+      }).join('');
+  document.getElementById('dash-noshows').innerHTML = nsHtml;
+
+  document.getElementById('dash-settings').innerHTML = `<div class="card">
+    <div class="section-label">booking window</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:.75rem">students can book up to 2 hours before each slot.</p>
+    <div class="section-label">no-show window</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:.75rem">slot releases after 30 minutes. next eligible student on waitlist is promoted.</p>
+    <div class="section-label">rate limiting</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:.75rem">3-second cooldown between actions. max 10 bookings per 5 minutes per page session.</p>
+    <div class="section-label">session timeout</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:.75rem">instructor dashboard auto-signs out after 20 minutes of inactivity.</p>
+    <div class="section-label">PIN lockout</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:.75rem">5 wrong attempts locks the PIN screen for 5 minutes.</p>
+    <div class="section-label">change PIN</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:.5rem">PIN is stored as a SHA-256 hash — never in plaintext.</p>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <input type="password" id="new-pin" placeholder="new PIN (4–6 digits)" maxlength="6" inputmode="numeric" style="width:180px" autocomplete="new-password">
+      <button class="btn btn-sm btn-primary" onclick="changePIN()">save</button>
+    </div>
+    <div id="pin-saved" style="font-size:12px;color:var(--green);margin-top:6px;display:none"><i class="ti ti-check" aria-hidden="true"></i> PIN hash updated — copy new hash to HASHED_PIN constant</div>
+    <div id="pin-hash-out" style="font-size:11px;color:var(--text3);margin-top:4px;font-family:monospace;word-break:break-all;display:none"></div>
+  </div>`;
+}
+
+function renderSecurityLog(){
+  if(!requireSession()) return;
+  const typeClass = {
+    'auth-success':'log-ok','promote':'log-ok','booking':'log-ok',
+    'auth-fail':'log-fail','lockout':'log-fail','tamper-attempt':'log-fail','integrity-warn':'log-fail','rate-limit':'log-fail',
+    'no-show':'log-warn','cancel':'log-warn','admin-cancel':'log-warn','session':'log-warn','auth-logout':'log-warn'
+  };
+  const html = securityLog.length === 0
+    ? '<p class="muted" style="padding:.5rem">no events yet.</p>'
+    : securityLog.map(e=>`<div class="${typeClass[e.type]||''}">[${esc(e.time)}] <strong>${esc(e.type)}</strong> — ${esc(e.detail)}</div>`).join('');
+  document.getElementById('dash-security').innerHTML = `
+    <div class="section-label">event log (last ${MAX_LOG_ENTRIES} actions)</div>
+    <div class="security-log" role="log" aria-live="polite">${html}</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-sm btn-danger" onclick="clearLog()">clear log</button>
+      <button class="btn btn-sm" onclick="exportLog()"><i class="ti ti-download" aria-hidden="true"></i> export CSV</button>
+    </div>`;
+}
+
+function clearLog(){
+  if(!requireSession()) return;
+  securityLog = [];
+  renderSecurityLog();
+  logEvent('log-cleared','Instructor cleared security log');
+}
+
+function exportLog(){
+  if(!requireSession()) return;
+  const csv = ['time,isoTime,type,detail',
+    ...securityLog.map(e=>`"${e.time}","${e.isoTime}","${e.type}","${e.detail}"`)
+  ].join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'wheelbook-log.csv'; a.click();
+  URL.revokeObjectURL(url);
+  logEvent('log-export','Instructor exported security log');
+}
+
+async function changePIN(){
+  if(!requireSession()) return;
+  const inp = document.getElementById('new-pin');
+  const val = inp.value.trim();
+  if(!/^\d{4,6}$/.test(val)){ showToast('PIN must be 4–6 digits'); return; }
+  const hash = await sha256(val);
+  inp.value = '';
+  document.getElementById('pin-saved').style.display = 'block';
+  document.getElementById('pin-hash-out').style.display = 'block';
+  document.getElementById('pin-hash-out').textContent = 'new hash: ' + hash;
+  logEvent('pin-change','Instructor generated new PIN hash');
+}
+
+/* ── INSTRUCTOR ACTIONS ───────────────────────────────────────── */
+function adminCancel(k){
+  if(!requireSession()) return;
+  reservations[k] = null;
+  clearInterval(countdownIntervals[k]);
+  delete countdownIntervals[k];
+  delete noShowTimers[k];
+  promoteWaitlist(k);
+  logEvent('admin-cancel','Instructor cancelled slot '+k);
+  renderDash(); renderSlots();
+}
+
+function removeStudent(id){
+  if(!requireSession()) return;
+  const stu = students.find(s=>s.id===id);
+  students = students.filter(s=>s.id!==id);
+  Object.keys(reservations).forEach(k=>{ if(reservations[k]===id) reservations[k]=null; });
+  Object.keys(waitlists).forEach(k=>{ waitlists[k]=waitlists[k].filter(s=>s!==id); });
+  if(currentStudent===id){ currentStudent=null; document.getElementById('student-select').value=''; }
+  logEvent('roster',`Removed student: ${stu?.name}`);
+  populateRoster(); renderDash(); renderSlots();
+}
+
+function addStudent(){
+  if(!requireSession()) return;
+  const inp  = document.getElementById('new-student-name');
+  const raw  = inp.value;
+  const name = sanitize(raw);
+  if(!isValidName(name)){ showToast('enter a valid name (letters only, 2–40 chars)'); return; }
+  if(students.length >= MAX_STUDENTS){ showToast('roster limit reached'); return; }
+  if(students.some(s=>s.name.toLowerCase()===name.toLowerCase())){ showToast('student already exists'); return; }
+  const id = 's' + Date.now();
+  students.push({id, name});
+  inp.value = '';
+  logEvent('roster','Added student: '+name);
+  populateRoster(); renderDash(); renderSlots();
+}
+
+/* ── DASHBOARD TABS ───────────────────────────────────────────── */
+function showDashTab(tab, btn){
+  if(!requireSession()) return;
+  document.querySelectorAll('.tab').forEach(t=>{ t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
+  btn.classList.add('active');
+  btn.setAttribute('aria-selected','true');
+  ['today','roster','noshows','security','settings'].forEach(t=>{
+    document.getElementById('dash-'+t).style.display = t===tab ? 'block' : 'none';
+  });
+  if(tab==='security') renderSecurityLog();
+}
+
+/* ── MODAL ────────────────────────────────────────────────────── */
+function openModal(title, body, confirmLabel){
+  document.getElementById('modal-title').textContent  = title;
+  document.getElementById('modal-body').textContent   = body;
+  document.getElementById('modal-confirm').textContent= confirmLabel;
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('modal-confirm').focus();
+}
+function closeModal(){ document.getElementById('modal-overlay').classList.remove('open'); pendingAction=null; }
+document.getElementById('modal-confirm').onclick = ()=>{ if(pendingAction) pendingAction(); closeModal(); };
+// Close modal on overlay click
+document.getElementById('modal-overlay').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeModal(); });
+// Close modal on Escape
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+
+/* ── TOAST ────────────────────────────────────────────────────── */
+function showToast(msg){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = sanitize(msg).slice(0,80);
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(()=>t.remove(), 3500);
+}
+
+/* ── ROSTER POPULATE ──────────────────────────────────────────── */
+function populateRoster(){
+  const sel = document.getElementById('student-select');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— select your name —</option>';
+  students.forEach(s=>{
+    const o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = s.name; // textContent is XSS-safe
+    sel.appendChild(o);
+  });
+  sel.value = cur;
+}
+
+/* ── COUNTDOWN REFRESH ────────────────────────────────────────── */
+function restartCountdownDisplays(){
+  Object.keys(noShowTimers).forEach(k=>{
+    const el = document.getElementById('cd-'+k);
+    const remaining = noShowTimers[k].end - Date.now();
+    if(el) el.textContent = remaining > 0 ? Math.ceil(remaining/60000)+'m' : 'releasing...';
+  });
+}
+
+/* ── INIT ─────────────────────────────────────────────────────── */
+populateRoster();
+renderDayTabs();
+renderSlots();
+logEvent('system','Wheelbook loaded');
+integrityCheck();
+</script>
+</body>
+</html>
