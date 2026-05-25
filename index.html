@@ -422,7 +422,7 @@ async function lookupStudent(){
   document.querySelector('.btn-primary').disabled=false;
 
   if(error||!data){
-    showInfoBanner('email not found — contact your instructor to be added to the roster');
+    showInfoBanner('email not found, contact your instructor to be added to the roster or sign up');
     logEvent('login-fail',`Email lookup failed: ${raw}`);
     return;
   }
