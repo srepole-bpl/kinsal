@@ -3,611 +3,165 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src https://cdn.jsdelivr.net https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none'">
 <title>kinsal · studio management</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-/* ── KINSAL DESIGN TOKENS ───────────────────────────────────────── */
 :root {
-  /* palette — linen/parchment base, dark brown type, blue accent */
-  --bg:        #f5f2ec;   
-  --bg2:       #ede9e0;   
-  --bg3:       #e4dfd4;   
-  --surface:   #faf8f4;   
-
-  --ink:       #2c2416;   
-  --ink2:      #5c5040;  
-  --ink3:      #9c8e7c;   
-
-  --border:    rgba(44,36,22,0.10);
-  --border2:   rgba(44,36,22,0.18);
-
-  /* blue accent kept from your palette */
-  --blue:      #3a72c4;
-  --blue-light:#e8f0fc;
-  --blue-dark: #2558a8;
-  --blue-text: #1a3d7a;
-
-  /* states */
-  --red:       #8c2c1e;
-  --red-light: #f5e8e6;
-  --amber:     #7a4800;
-  --amber-light:#f5ead6;
-
-  /* typography */
-  --font-head: 'Playfair Display', 'Georgia', serif;
-  --font-body: 'DM Sans', system-ui, sans-serif;
-
-  /* radii — slightly irregular feel */
-  --r1: 6px;
-  --r2: 11px;
-  --r3: 16px;
+  --bg:#f5f2ec;--bg2:#ede9e0;--bg3:#e4dfd4;--surface:#faf8f4;
+  --ink:#2c2416;--ink2:#5c5040;--ink3:#9c8e7c;
+  --border:rgba(44,36,22,0.10);--border2:rgba(44,36,22,0.18);
+  --blue:#3a72c4;--blue-light:#e8f0fc;--blue-dark:#2558a8;--blue-text:#1a3d7a;
+  --red:#8c2c1e;--red-light:#f5e8e6;
+  --amber:#7a4800;--amber-light:#f5ead6;
+  --green:#2d6e3a;--green-light:#e6f0e8;
+  --font-head:'Playfair Display','Georgia',serif;
+  --font-body:'DM Sans',system-ui,sans-serif;
+  --r1:6px;--r2:11px;--r3:16px;
 }
-
-
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.038;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
-}
-
-
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.022;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-  background-size: 100px 100px;
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-body);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-}
-
-.app {
-  max-width: 660px;
-  margin: 0 auto;
-  padding: 1.75rem 1.25rem 3rem;
-  position: relative;
-  z-index: 1;
-}
-
-/* ── VIEWS ──────────────────────────────────────────────────────── */
-.view { display: none; }
-.view.active { display: block; }
-
-/* ── LOGO / TOP BAR ─────────────────────────────────────────────── */
-.top-bar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 1.75rem;
-}
-
-.logo {
-  font-family: var(--font-head);
-  font-size: 22px;
-  font-weight: 500;
-  color: var(--ink);
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-}
-
-.logo-sub {
-  display: block;
-  font-family: var(--font-body);
-  font-size: 11px;
-  font-weight: 300;
-  color: var(--ink3);
-  letter-spacing: 0.12em;
-  text-transform: lowercase;
-  margin-top: 2px;
-}
-
-.security-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 20px;
-  background: var(--bg3);
-  color: var(--ink3);
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  margin-left: 10px;
-  vertical-align: middle;
-}
-
-/* ── BUTTONS ────────────────────────────────────────────────────── */
-.btn {
-  padding: 8px 18px;
-
-  border-radius: 9px 8px 10px 8px;
-  border: 1px solid var(--border2);
-  background: var(--surface);
-  color: var(--ink2);
-  font-size: 13px;
-  font-family: var(--font-body);
-  font-weight: 400;
-  cursor: pointer;
-  transition: background .18s, border-color .18s;
-  letter-spacing: 0.01em;
-  text-transform: lowercase;
-}
-.btn:hover { background: var(--bg2); border-color: var(--border2); }
-.btn:disabled { opacity: .4; cursor: not-allowed; }
-
-.btn-primary {
-  background: var(--blue);
-  color: #fff;
-  border-color: var(--blue);
-  border-radius: 8px 10px 9px 9px;
-}
-.btn-primary:hover { background: var(--blue-dark); border-color: var(--blue-dark); }
-
-.btn-danger {
-  background: var(--red-light);
-  color: var(--red);
-  border-color: rgba(140,44,30,0.25);
-}
-
-.btn-sm { padding: 5px 13px; font-size: 12px; }
-
-/* ── CARDS ──────────────────────────────────────────────────────── */
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  /* slightly irregular corners */
-  border-radius: 12px 11px 13px 11px;
-  padding: 1rem 1.2rem;
-  margin-bottom: 10px;
-}
-
-/* ── RULE BOX ───────────────────────────────────────────────────── */
-.rule-box {
-  background: var(--bg2);
-  border-radius: 10px 11px 10px 12px;
-  border: 1px solid var(--border);
-  padding: .8rem 1rem;
-  font-size: 12.5px;
-  color: var(--ink3);
-  margin-bottom: 1.25rem;
-  line-height: 2;
-}
-.rule-box i { color: var(--ink3); margin-right: 7px; font-size: 13px; }
-
-/* ── DAY TABS ───────────────────────────────────────────────────── */
-.day-tabs { display: flex; gap: 7px; margin-bottom: 1.25rem; flex-wrap: wrap; }
-
-.day-tab {
-  padding: 5px 14px;
-  border-radius: 8px 9px 8px 10px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--ink3);
-  font-size: 12.5px;
-  font-family: var(--font-body);
-  cursor: pointer;
-  transition: all .15s;
-  text-transform: lowercase;
-  letter-spacing: 0.01em;
-}
-.day-tab:hover { background: var(--bg2); color: var(--ink2); }
-.day-tab.active {
-  background: var(--blue-light);
-  color: var(--blue-text);
-  border-color: rgba(58,114,196,0.3);
-  font-weight: 500;
-}
-
-/* ── SLOT CARDS ─────────────────────────────────────────────────── */
-.slot-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 13px 12px 14px 12px;
-  padding: 1rem 1.1rem;
-  margin-bottom: 10px;
-}
-
-.slot-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.slot-time {
-  font-family: var(--font-head);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--ink);
-  letter-spacing: -0.01em;
-}
-
-.slot-label {
-  font-size: 10.5px;
-  padding: 3px 9px;
-  border-radius: 20px;
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  text-transform: lowercase;
-}
-.badge-open  { background: #e6f0e8; color: #2d6e3a; border: 1px solid rgba(45,110,58,0.2); }
-.badge-full  { background: var(--red-light); color: var(--red); border: 1px solid rgba(140,44,30,0.18); }
-.badge-locked{ background: var(--bg3); color: var(--ink3); border: 1px solid var(--border); }
-
-/* ── WHEEL SLOTS ────────────────────────────────────────────────── */
-.wheel-slot {
-  padding: 9px 11px;
-  border-radius: 8px 9px 8px 9px;
-  border: 1px solid var(--border);
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  transition: border-color .15s;
-}
-.wheel-slot.booked { background: #eef5ef; border-color: rgba(45,110,58,0.25); }
-.wheel-slot.mine   { background: var(--blue-light); border-color: rgba(58,114,196,0.3); }
-.wheel-slot.empty  { background: var(--bg2); }
-
-.student-name { font-weight: 500; font-size: 13px; color: var(--ink); }
-.muted { color: var(--ink3); font-size: 11.5px; }
-
-.countdown {
-  font-size: 10.5px;
-  color: var(--amber);
-  font-weight: 500;
-  background: var(--amber-light);
-  padding: 2px 8px;
-  border-radius: 20px;
-  border: 1px solid rgba(122,72,0,0.18);
-}
-
-/* ── SECTION LABELS ─────────────────────────────────────────────── */
-.section-label {
-  font-family: var(--font-body);
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--ink3);
-  text-transform: lowercase;
-  letter-spacing: 0.1em;
-  margin-bottom: 7px;
-  margin-top: 16px;
-}
-
-/* ── SELECT ─────────────────────────────────────────────────────── */
-.select-student {
-  width: 100%;
-  padding: 10px 13px;
-  border-radius: 10px 11px 10px 11px;
-  border: 1px solid var(--border2);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 14px;
-  font-family: var(--font-body);
-  margin-bottom: 1.1rem;
-  cursor: pointer;
-  appearance: auto;
-}
-
-/* ── PIN SCREEN ─────────────────────────────────────────────────── */
-.pin-screen {
-  max-width: 280px;
-  margin: 3.5rem auto;
-  text-align: center;
-}
-.pin-screen-title {
-  font-family: var(--font-head);
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--ink);
-  margin-top: .75rem;
-  letter-spacing: -0.01em;
-}
-
-.pin-input {
-  width: 100%;
-  padding: 13px;
-  font-size: 22px;
-  letter-spacing: .35em;
-  text-align: center;
-  border-radius: 10px 11px 10px 12px;
-  border: 1px solid var(--border2);
-  background: var(--surface);
-  color: var(--ink);
-  font-family: monospace;
-  margin: 1rem 0;
-}
-.pin-error {
-  color: var(--red);
-  font-size: 12.5px;
-  min-height: 20px;
-}
-
-/* ── BANNERS ────────────────────────────────────────────────────── */
-.lockout-banner {
-  background: var(--red-light);
-  color: var(--red);
-  border-radius: 8px;
-  border: 1px solid rgba(140,44,30,0.18);
-  padding: .7rem 1rem;
-  font-size: 12.5px;
-  margin-bottom: 1rem;
-  display: none;
-}
-.rate-banner {
-  background: var(--amber-light);
-  color: var(--amber);
-  border-radius: 8px;
-  border: 1px solid rgba(122,72,0,0.18);
-  padding: 7px 12px;
-  font-size: 12.5px;
-  margin-bottom: 10px;
-  display: none;
-}
-
-/* ── INSTRUCTOR TABS ────────────────────────────────────────────── */
-.tab-bar {
-  display: flex;
-  gap: 2px;
-  margin-bottom: 1.25rem;
-  border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
-}
-.tab {
-  padding: 7px 14px;
-  font-size: 12.5px;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  color: var(--ink3);
-  background: none;
-  border-left: none;
-  border-right: none;
-  border-top: none;
-  font-family: var(--font-body);
-  margin-bottom: -1px;
-  text-transform: lowercase;
-  letter-spacing: 0.01em;
-  transition: color .15s;
-}
-.tab:hover { color: var(--ink2); }
-.tab.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 500; }
-
-/* ── DASH METRICS ───────────────────────────────────────────────── */
-.dash-grid {
-  display: grid;
-  grid-template-columns: repeat(3,1fr);
-  gap: 9px;
-  margin-bottom: 1.25rem;
-}
-.metric {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 11px 10px 12px 10px;
-  padding: .8rem 1rem;
-  text-align: center;
-}
-.metric-val {
-  font-family: var(--font-head);
-  font-size: 26px;
-  font-weight: 400;
-  color: var(--ink);
-  letter-spacing: -0.02em;
-}
-.metric-label { font-size: 11px; color: var(--ink3); margin-top: 2px; text-transform: lowercase; }
-
-/* ── ROSTER ─────────────────────────────────────────────────────── */
-.roster-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--border);
-}
-.roster-row:last-child { border-bottom: none; }
-
-.avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--blue-light);
-  color: var(--blue-text);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 500;
-  flex-shrink: 0;
-  border: 1px solid rgba(58,114,196,0.18);
-}
-
-/* ── NO-SHOW ROW ────────────────────────────────────────────────── */
-.no-show-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  background: var(--amber-light);
-  border-radius: 8px;
-  border: 1px solid rgba(122,72,0,0.14);
-  margin-bottom: 6px;
-  font-size: 12.5px;
-}
-
-/* ── SECURITY LOG ───────────────────────────────────────────────── */
-.security-log {
-  background: var(--bg3);
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  padding: .75rem 1rem;
-  font-size: 11.5px;
-  color: var(--ink3);
-  max-height: 220px;
-  overflow-y: auto;
-  font-family: monospace;
-  line-height: 1.9;
-}
-.security-log .log-warn { color: var(--amber); }
-.security-log .log-fail { color: var(--red); }
-.security-log .log-ok   { color: #2d6e3a; }
-
-/* ── MODAL ──────────────────────────────────────────────────────── */
-.modal-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(44,36,22,0.35);
-  z-index: 50;
-  align-items: center;
-  justify-content: center;
-}
-.modal-overlay.open { display: flex; }
-
-.modal {
-  background: var(--surface);
-  border-radius: 14px 13px 15px 13px;
-  border: 1px solid var(--border2);
-  padding: 1.4rem 1.5rem;
-  width: 320px;
-  max-width: 90vw;
-  position: relative;
-  z-index: 1;
-}
-.modal::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0.025;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 120px 120px;
-}
-
-.modal h3 {
-  font-family: var(--font-head);
-  font-size: 17px;
-  font-weight: 500;
-  margin-bottom: .5rem;
-  color: var(--ink);
-  letter-spacing: -0.01em;
-}
-.modal p { font-size: 13px; color: var(--ink2); margin-bottom: 1.1rem; line-height: 1.55; }
-.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
-
-/* ── TOAST ──────────────────────────────────────────────────────── */
-.toast-container {
-  position: fixed;
-  bottom: 22px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-.toast {
-  background: var(--ink);
-  color: var(--bg);
-  padding: 9px 18px;
-  border-radius: 9px 10px 9px 10px;
-  font-size: 12.5px;
-  white-space: nowrap;
-  animation: fadeUp .2s ease;
-  letter-spacing: 0.01em;
-}
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-/* ── SESSION BAR ────────────────────────────────────────────────── */
-.session-bar {
-  font-size: 11px;
-  color: var(--ink3);
-  text-align: right;
-  margin-bottom: 6px;
-  letter-spacing: 0.03em;
-}
-
-/* ── INPUTS ─────────────────────────────────────────────────────── */
-input[type=text],
-input[type=password],
-input[type=number] {
-  padding: 9px 12px;
-  border-radius: 8px 9px 8px 9px;
-  border: 1px solid var(--border2);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 13.5px;
-  font-family: var(--font-body);
-}
-
-.flex-between { display: flex; align-items: center; justify-content: space-between; }
-
-/* ── DIVIDER ORNAMENT ───────────────────────────────────────────── */
-.ornament {
-  text-align: center;
-  color: var(--ink3);
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  margin: 1.25rem 0 .75rem;
-  opacity: 0.5;
-}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.038;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size:180px 180px;}
+body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.022;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size:100px 100px;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;font-weight:400;line-height:1.6;-webkit-font-smoothing:antialiased}
+.app{max-width:660px;margin:0 auto;padding:1.75rem 1.25rem 3rem;position:relative;z-index:1}
+.view{display:none}.view.active{display:block}
+.top-bar{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.75rem}
+.logo{font-family:var(--font-head);font-size:22px;font-weight:500;color:var(--ink);letter-spacing:-0.01em;line-height:1.2}
+.logo-sub{display:block;font-family:var(--font-body);font-size:11px;font-weight:300;color:var(--ink3);letter-spacing:0.12em;text-transform:lowercase;margin-top:2px}
+.security-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 8px;border-radius:20px;background:var(--bg3);color:var(--ink3);font-weight:400;letter-spacing:0.04em;margin-left:10px;vertical-align:middle}
+.btn{padding:8px 18px;border-radius:9px 8px 10px 8px;border:1px solid var(--border2);background:var(--surface);color:var(--ink2);font-size:13px;font-family:var(--font-body);font-weight:400;cursor:pointer;transition:background .18s,border-color .18s;letter-spacing:0.01em;text-transform:lowercase}
+.btn:hover{background:var(--bg2)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue);border-radius:8px 10px 9px 9px}
+.btn-primary:hover{background:var(--blue-dark)}
+.btn-danger{background:var(--red-light);color:var(--red);border-color:rgba(140,44,30,0.25)}
+.btn-sm{padding:5px 13px;font-size:12px}
+.btn-full{width:100%;padding:11px;font-size:14px;margin-top:8px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px 11px 13px 11px;padding:1rem 1.2rem;margin-bottom:10px}
+.rule-box{background:var(--bg2);border-radius:10px 11px 10px 12px;border:1px solid var(--border);padding:.8rem 1rem;font-size:12.5px;color:var(--ink3);margin-bottom:1.25rem;line-height:2}
+.rule-box i{color:var(--ink3);margin-right:7px;font-size:13px}
+.day-tabs{display:flex;gap:7px;margin-bottom:1.25rem;flex-wrap:wrap}
+.day-tab{padding:5px 14px;border-radius:8px 9px 8px 10px;border:1px solid var(--border);background:var(--surface);color:var(--ink3);font-size:12.5px;font-family:var(--font-body);cursor:pointer;transition:all .15s;text-transform:lowercase;letter-spacing:0.01em}
+.day-tab:hover{background:var(--bg2);color:var(--ink2)}
+.day-tab.active{background:var(--blue-light);color:var(--blue-text);border-color:rgba(58,114,196,0.3);font-weight:500}
+.slot-card{background:var(--surface);border:1px solid var(--border);border-radius:13px 12px 14px 12px;padding:1rem 1.1rem;margin-bottom:10px}
+.slot-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.slot-time{font-family:var(--font-head);font-size:14px;font-weight:500;color:var(--ink);letter-spacing:-0.01em}
+.slot-label{font-size:10.5px;padding:3px 9px;border-radius:20px;font-weight:400;letter-spacing:0.04em;text-transform:lowercase}
+.badge-open{background:var(--green-light);color:var(--green);border:1px solid rgba(45,110,58,0.2)}
+.badge-full{background:var(--red-light);color:var(--red);border:1px solid rgba(140,44,30,0.18)}
+.badge-locked{background:var(--bg3);color:var(--ink3);border:1px solid var(--border)}
+.wheel-slot{padding:9px 11px;border-radius:8px 9px 8px 9px;border:1px solid var(--border);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;font-size:13px;transition:border-color .15s}
+.wheel-slot.booked{background:var(--green-light);border-color:rgba(45,110,58,0.25)}
+.wheel-slot.mine{background:var(--blue-light);border-color:rgba(58,114,196,0.3)}
+.wheel-slot.empty{background:var(--bg2)}
+.student-name{font-weight:500;font-size:13px;color:var(--ink)}
+.muted{color:var(--ink3);font-size:11.5px}
+.countdown{font-size:10.5px;color:var(--amber);font-weight:500;background:var(--amber-light);padding:2px 8px;border-radius:20px;border:1px solid rgba(122,72,0,0.18)}
+.section-label{font-family:var(--font-body);font-size:10px;font-weight:500;color:var(--ink3);text-transform:lowercase;letter-spacing:0.1em;margin-bottom:7px;margin-top:16px}
+.pin-screen{max-width:300px;margin:3rem auto;text-align:center}
+.pin-screen-title{font-family:var(--font-head);font-size:20px;font-weight:500;color:var(--ink);margin-top:.75rem;letter-spacing:-0.01em}
+.pin-input{width:100%;padding:13px;font-size:22px;letter-spacing:.35em;text-align:center;border-radius:10px 11px 10px 12px;border:1px solid var(--border2);background:var(--surface);color:var(--ink);font-family:monospace;margin:1rem 0}
+.pin-error{color:var(--red);font-size:12.5px;min-height:20px}
+.lockout-banner{background:var(--red-light);color:var(--red);border-radius:8px;border:1px solid rgba(140,44,30,0.18);padding:.7rem 1rem;font-size:12.5px;margin-bottom:1rem;display:none}
+.rate-banner{background:var(--amber-light);color:var(--amber);border-radius:8px;border:1px solid rgba(122,72,0,0.18);padding:7px 12px;font-size:12.5px;margin-bottom:10px;display:none}
+.info-banner{background:var(--blue-light);color:var(--blue-text);border-radius:8px;border:1px solid rgba(58,114,196,0.2);padding:7px 12px;font-size:12.5px;margin-bottom:10px;display:none}
+.tab-bar{display:flex;gap:2px;margin-bottom:1.25rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.tab{padding:7px 14px;font-size:12.5px;cursor:pointer;border-bottom:2px solid transparent;color:var(--ink3);background:none;border-left:none;border-right:none;border-top:none;font-family:var(--font-body);margin-bottom:-1px;text-transform:lowercase;letter-spacing:0.01em;transition:color .15s}
+.tab:hover{color:var(--ink2)}.tab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:500}
+.dash-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:1.25rem}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:11px 10px 12px 10px;padding:.8rem 1rem;text-align:center}
+.metric-val{font-family:var(--font-head);font-size:26px;font-weight:400;color:var(--ink);letter-spacing:-0.02em}
+.metric-label{font-size:11px;color:var(--ink3);margin-top:2px;text-transform:lowercase}
+.roster-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)}
+.roster-row:last-child{border-bottom:none}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--blue-light);color:var(--blue-text);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;border:1px solid rgba(58,114,196,0.18)}
+.no-show-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--amber-light);border-radius:8px;border:1px solid rgba(122,72,0,0.14);margin-bottom:6px;font-size:12.5px}
+.security-log{background:var(--bg3);border-radius:8px;border:1px solid var(--border);padding:.75rem 1rem;font-size:11.5px;color:var(--ink3);max-height:220px;overflow-y:auto;font-family:monospace;line-height:1.9}
+.security-log .log-warn{color:var(--amber)}.security-log .log-fail{color:var(--red)}.security-log .log-ok{color:var(--green)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(44,36,22,0.35);z-index:50;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:14px 13px 15px 13px;border:1px solid var(--border2);padding:1.4rem 1.5rem;width:320px;max-width:90vw}
+.modal h3{font-family:var(--font-head);font-size:17px;font-weight:500;margin-bottom:.5rem;color:var(--ink);letter-spacing:-0.01em}
+.modal p{font-size:13px;color:var(--ink2);margin-bottom:1.1rem;line-height:1.55}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+.toast-container{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:100;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:6px}
+.toast{background:var(--ink);color:var(--bg);padding:9px 18px;border-radius:9px 10px 9px 10px;font-size:12.5px;white-space:nowrap;animation:fadeUp .2s ease;letter-spacing:0.01em}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.session-bar{font-size:11px;color:var(--ink3);text-align:right;margin-bottom:6px;letter-spacing:0.03em}
+input[type=text],input[type=password],input[type=email],input[type=number]{padding:9px 12px;border-radius:8px 9px 8px 9px;border:1px solid var(--border2);background:var(--surface);color:var(--ink);font-size:13.5px;font-family:var(--font-body)}
+.flex-between{display:flex;align-items:center;justify-content:space-between}
+.email-screen{max-width:320px;margin:3rem auto;text-align:center}
+.email-input{width:100%;padding:11px 13px;border-radius:10px 11px 10px 11px;border:1px solid var(--border2);background:var(--surface);color:var(--ink);font-size:14px;font-family:var(--font-body);margin:1rem 0;text-align:center}
+.student-card{background:var(--surface);border:1px solid var(--border);border-radius:12px 11px 13px 11px;padding:1rem 1.2rem;margin-bottom:1rem}
+.hours-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.hours-tile{background:var(--bg2);border-radius:9px 10px 9px 10px;border:1px solid var(--border);padding:.7rem .8rem;text-align:center}
+.hours-val{font-family:var(--font-head);font-size:20px;font-weight:400;color:var(--ink);letter-spacing:-0.02em}
+.hours-label{font-size:10.5px;color:var(--ink3);margin-top:2px;text-transform:lowercase}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-state{text-align:center;padding:2rem;color:var(--ink3);font-size:13px}
 </style>
 </head>
 <body>
 <div class="app" id="app">
-
 <div class="toast-container" id="toast-container"></div>
 
-<!-- student view -->
-<div id="student-view" class="view active">
+<!-- EMAIL LOGIN VIEW -->
+<div id="email-view" class="view active">
   <div class="top-bar">
     <div>
-      <div class="logo">
-        kinsal
-        <span class="security-badge"><i class="ti ti-shield-check" aria-hidden="true"></i>secured</span>
-      </div>
+      <div class="logo">kinsal<span class="security-badge"><i class="ti ti-shield-check" aria-hidden="true"></i>secured</span></div>
       <span class="logo-sub">studio management</span>
     </div>
-    <button class="btn btn-sm" onclick="showPinView()" aria-label="Instructor login">
-      <i class="ti ti-lock" aria-hidden="true"></i> instructor
-    </button>
+    <button class="btn btn-sm" onclick="showPinView()"><i class="ti ti-lock" aria-hidden="true"></i> instructor</button>
   </div>
-
   <div id="rate-banner" class="rate-banner" role="alert" aria-live="polite">
-    <i class="ti ti-alert-triangle" aria-hidden="true"></i>
-    <span id="rate-msg">slow down — please wait before trying again</span>
+    <i class="ti ti-alert-triangle" aria-hidden="true"></i> <span id="rate-msg">slow down — please wait before trying again</span>
+  </div>
+  <div id="info-banner" class="info-banner" role="status" aria-live="polite">
+    <i class="ti ti-info-circle" aria-hidden="true"></i> <span id="info-msg"></span>
+  </div>
+  <div class="email-screen">
+    <div class="logo" style="font-size:28px;margin-bottom:.5rem">kinsal</div>
+    <p style="font-size:13px;color:var(--ink3);margin-bottom:.25rem">enter your email to reserve a wheel</p>
+    <input class="email-input" type="email" id="email-input" placeholder="you@example.com"
+      autocomplete="email" inputmode="email" aria-label="Your email address">
+    <button class="btn btn-primary btn-full" onclick="lookupStudent()">
+      <span id="lookup-btn-text">continue</span>
+    </button>
+    <p style="font-size:11.5px;color:var(--ink3);margin-top:1rem">not registered? contact your instructor.</p>
+  </div>
+</div>
+
+<!-- STUDENT BOOKING VIEW -->
+<div id="student-view" class="view">
+  <div class="top-bar">
+    <div>
+      <div class="logo">kinsal<span class="security-badge"><i class="ti ti-shield-check" aria-hidden="true"></i>secured</span></div>
+      <span class="logo-sub">studio management</span>
+    </div>
+    <button class="btn btn-sm" onclick="signOutStudent()"><i class="ti ti-logout" aria-hidden="true"></i> sign out</button>
+  </div>
+  <div id="rate-banner-2" class="rate-banner" role="alert" aria-live="polite">
+    <i class="ti ti-alert-triangle" aria-hidden="true"></i> <span id="rate-msg-2">slow down</span>
   </div>
 
-  <p style="font-size:13px;color:var(--ink3);margin-bottom:.85rem;letter-spacing:0.01em">select your name to reserve a wheel</p>
-
-  <select class="select-student" id="student-select" onchange="onStudentSelect()" aria-label="Select your name"></select>
+  <!-- student stats card -->
+  <div class="student-card" id="student-stats-card">
+    <div class="flex-between" style="margin-bottom:8px">
+      <div>
+        <div style="font-family:var(--font-head);font-size:17px;font-weight:500;color:var(--ink)" id="student-greeting">welcome</div>
+        <div class="muted" id="student-email-display"></div>
+      </div>
+      <div class="avatar" id="student-avatar" style="width:38px;height:38px;font-size:13px"></div>
+    </div>
+    <div class="hours-grid" id="student-hours"></div>
+  </div>
 
   <div class="rule-box" role="note">
     <div><i class="ti ti-clock" aria-hidden="true"></i>reserve up to 2 hours before each slot</div>
@@ -615,48 +169,44 @@ input[type=number] {
     <div><i class="ti ti-calendar" aria-hidden="true"></i>one reservation per student per day</div>
     <div><i class="ti ti-shield" aria-hidden="true"></i>all activity is logged</div>
   </div>
-
-  <div class="day-tabs" id="day-tabs" role="tablist" aria-label="Day selection"></div>
+  <div class="day-tabs" id="day-tabs" role="tablist"></div>
   <div id="slot-area" role="region" aria-label="Available wheel slots"></div>
 </div>
 
-<!-- pin view -->
-<div id="pin-view" class="view" role="main">
+<!-- PIN VIEW -->
+<div id="pin-view" class="view">
   <div class="pin-screen">
     <div class="logo" style="font-size:26px">kinsal</div>
     <div class="pin-screen-title">instructor access</div>
     <p class="muted" style="margin-top:5px;font-size:12.5px">enter your pin to continue</p>
     <div id="lockout-banner" class="lockout-banner" role="alert">
-      <i class="ti ti-lock" aria-hidden="true"></i>
-      <span id="lockout-msg">too many attempts — locked</span>
+      <i class="ti ti-lock" aria-hidden="true"></i> <span id="lockout-msg">too many attempts — locked</span>
     </div>
     <input class="pin-input" type="password" maxlength="6" id="pin-input"
       placeholder="••••" oninput="onPinInput()" autocomplete="off"
       inputmode="numeric" pattern="[0-9]*" aria-label="PIN entry">
     <div class="pin-error" id="pin-error" role="alert" aria-live="assertive"></div>
-    <button class="btn" onclick="showStudent()" style="margin-top:.5rem;width:100%">cancel</button>
+    <button class="btn btn-full" onclick="showEmailView()">cancel</button>
   </div>
 </div>
 
-<!-- instructor view -->
+<!-- INSTRUCTOR VIEW -->
 <div id="instructor-view" class="view">
   <div class="top-bar">
     <div>
       <div class="logo">kinsal</div>
       <span class="logo-sub">instructor dashboard</span>
     </div>
-    <button class="btn btn-sm" onclick="instructorLogout()">
-      <i class="ti ti-logout" aria-hidden="true"></i> sign out
-    </button>
+    <button class="btn btn-sm" onclick="instructorLogout()"><i class="ti ti-logout" aria-hidden="true"></i> sign out</button>
   </div>
   <div id="session-bar" class="session-bar"></div>
   <div class="dash-grid" id="dash-metrics"></div>
   <div class="tab-bar" role="tablist">
-    <button class="tab active" onclick="showDashTab('today',this)" role="tab" aria-selected="true">today's slots</button>
-    <button class="tab" onclick="showDashTab('roster',this)" role="tab" aria-selected="false">roster</button>
-    <button class="tab" onclick="showDashTab('noshows',this)" role="tab" aria-selected="false">no-shows</button>
-    <button class="tab" onclick="showDashTab('security',this)" role="tab" aria-selected="false">security log</button>
-    <button class="tab" onclick="showDashTab('settings',this)" role="tab" aria-selected="false">settings</button>
+    <button class="tab active" onclick="showDashTab('today',this)">today's slots</button>
+    <button class="tab" onclick="showDashTab('roster',this)">roster</button>
+    <button class="tab" onclick="showDashTab('noshows',this)">no-shows</button>
+    <button class="tab" onclick="showDashTab('security',this)">security log</button>
+    <button class="tab" onclick="showDashTab('settings',this)">settings</button>
   </div>
   <div id="dash-today"></div>
   <div id="dash-roster" style="display:none"></div>
@@ -665,7 +215,7 @@ input[type=number] {
   <div id="dash-settings" style="display:none"></div>
 </div>
 
-<!-- modal -->
+<!-- MODAL -->
 <div id="modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
   <div class="modal">
     <h3 id="modal-title">confirm</h3>
@@ -676,10 +226,14 @@ input[type=number] {
     </div>
   </div>
 </div>
-
-</div><!-- /app -->
+</div>
 
 <script>
+/* ── SUPABASE ─────────────────────────────────────────────────── */
+const SUPABASE_URL = 'https://dhottawheezvotadbsqq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRob3R0YXdoZWV6dm90YWRic3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2NjYzODQsImV4cCI6MjA5NTI0MjM4NH0.9dlYpaPafXNCfS395N-nux4x4ZHJRgNOD_qJTQMMfHI';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 /* ── SECURITY CONFIG ─────────────────────────────────────────── */
 const HASHED_PIN         = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4';
 const MAX_PIN_ATTEMPTS   = 5;
@@ -697,43 +251,40 @@ async function sha256(str){
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-function integrityCheck(){
-  const flagged=[];
-  if(typeof bookSlot!=='function') flagged.push('bookSlot');
-  if(typeof checkPin!=='function') flagged.push('checkPin');
-  if(flagged.length) logEvent('integrity-warn','Integrity check flagged: '+flagged.join(', '));
-}
-
 /* ── APP STATE ───────────────────────────────────────────────── */
 const DAYS  = ['Tuesday','Thursday','Saturday','Sunday'];
 const SLOTS = [
-  {id:'am',label:'morning',time:'9:00 am – 1:00 pm',start:9,end:13},
-  {id:'pm',label:'evening',time:'4:00 pm – 8:00 pm',start:16,end:20}
+  {id:'am',label:'morning',time:'9:00 am – 1:00 pm',hours:4,start:9,end:13},
+  {id:'pm',label:'evening',time:'4:00 pm – 8:00 pm',hours:4,start:16,end:20}
 ];
-const WHEELS = ['Wheel A','Wheel B'];
+const WHEELS = ['Shimpo','Pacifica','BHR'];
 
-let students = [
-  {id:'s1',name:'Ava Chen'},{id:'s2',name:'Marcus Bell'},
-  {id:'s3',name:'Priya Nair'},{id:'s4',name:'Jordan Ellis'},
-  {id:'s5',name:'Sam Torres'},{id:'s6',name:'Lily Park'},
-  {id:'s7',name:'Theo Grant'}
-];
-let reservations={}, waitlists={}, noShows=[], noShowTimers={}, countdownIntervals={};
-let currentStudent=null, currentDay=DAYS[0], pendingAction=null;
-let instructorSession=null, sessionTimer=null;
-let pinAttempts=0, pinLockedUntil=0, lastActionTime={}, securityLog=[];
+let students     = [];
+let reservations = {};
+let waitlists    = {};
+let noShowTimers = {};
+let countdownIntervals = {};
 
-function logEvent(type,detail){
-  const now=new Date();
-  const safeDetail=String(detail).replace(/[<>"'&]/g,'').slice(0,200);
-  securityLog.unshift({time:now.toLocaleTimeString(),isoTime:now.toISOString(),type,detail:safeDetail});
-  if(securityLog.length>MAX_LOG_ENTRIES) securityLog.pop();
-}
+let currentStudent    = null; // { id, name, email }
+let currentDay        = DAYS[0];
+let pendingAction     = null;
+let instructorSession = null;
+let sessionTimer      = null;
+let pinAttempts       = 0;
+let pinLockedUntil    = 0;
+let lastActionTime    = {};
+let securityLog       = [];
 
+/* ── HELPERS ─────────────────────────────────────────────────── */
 function sanitize(str){
   return String(str).replace(/[<>"'&\/\\;`]/g,'').replace(/\s+/g,' ').trim().slice(0,MAX_NAME_LEN);
 }
 function isValidName(n){ return /^[a-zA-Z\s'\-\.]{2,40}$/.test(n); }
+function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+function esc(str){
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function key(d,s,w){ return `${d}|${s}|${w}`; }
 
 function isRateLimited(action){
   const now=Date.now();
@@ -747,27 +298,174 @@ function isTooManyBookings(){
   if(bookingWindow.length>=10) return true;
   bookingWindow.push(now); return false;
 }
-function showRateBanner(msg){
-  const b=document.getElementById('rate-banner');
-  document.getElementById('rate-msg').textContent=msg;
+
+function logEvent(type,detail){
+  const now=new Date();
+  securityLog.unshift({time:now.toLocaleTimeString(),isoTime:now.toISOString(),type,detail:String(detail).replace(/[<>"'&]/g,'').slice(0,200)});
+  if(securityLog.length>MAX_LOG_ENTRIES) securityLog.pop();
+}
+
+function showRateBanner(msg, secondary=false){
+  const id = secondary ? 'rate-banner-2' : 'rate-banner';
+  const msgId = secondary ? 'rate-msg-2' : 'rate-msg';
+  const b=document.getElementById(id);
+  document.getElementById(msgId).textContent=msg;
   b.style.display='block'; clearTimeout(b._t);
   b._t=setTimeout(()=>b.style.display='none',4000);
 }
-
-function key(d,s,w){ return `${d}|${s}|${w}`; }
-function initSlots(){
-  DAYS.forEach(d=>SLOTS.forEach(s=>WHEELS.forEach(w=>{
-    const k=key(d,s.id,w);
-    if(reservations[k]===undefined) reservations[k]=null;
-    if(!waitlists[k]) waitlists[k]=[];
-  })));
+function showInfoBanner(msg){
+  const b=document.getElementById('info-banner');
+  document.getElementById('info-msg').textContent=msg;
+  b.style.display='block'; clearTimeout(b._t);
+  b._t=setTimeout(()=>b.style.display='none',5000);
 }
-initSlots();
 
+/* ── AUTO-CLEAR SUNDAY NIGHT ─────────────────────────────────── */
+async function checkWeeklyReset(){
+  const now=new Date();
+  const lastReset=localStorage.getItem('kinsal_last_reset');
+  const weekStart=getWeekStart(now);
+  if(lastReset!==weekStart){
+    // Clear all reservations for new week
+    await db.from('reservations').delete().neq('key','__none__');
+    await db.from('waitlists').delete().neq('key','__none__');
+    localStorage.setItem('kinsal_last_reset',weekStart);
+    logEvent('system','Weekly reset — reservations cleared');
+  }
+}
+function getWeekStart(date){
+  const d=new Date(date);
+  const day=d.getDay(); // 0=Sun
+  const diff=d.getDate()-day;
+  d.setDate(diff); d.setHours(0,0,0,0);
+  return d.toISOString().split('T')[0];
+}
+
+/* ── SUPABASE DATA LAYER ─────────────────────────────────────── */
+async function loadStudents(){
+  const {data,error}=await db.from('students').select('*').order('name');
+  if(error){ logEvent('db-error','loadStudents: '+error.message); return; }
+  students=data||[];
+}
+
+async function loadReservations(){
+  const {data,error}=await db.from('reservations').select('*');
+  if(error){ logEvent('db-error','loadReservations: '+error.message); return; }
+  reservations={};
+  DAYS.forEach(d=>SLOTS.forEach(s=>WHEELS.forEach(w=>{ reservations[key(d,s.id,w)]=null; })));
+  (data||[]).forEach(r=>{ reservations[r.key]=r.student_id; });
+}
+
+async function loadWaitlists(){
+  const {data,error}=await db.from('waitlists').select('*').order('position');
+  if(error){ logEvent('db-error','loadWaitlists: '+error.message); return; }
+  waitlists={};
+  DAYS.forEach(d=>SLOTS.forEach(s=>WHEELS.forEach(w=>{ waitlists[key(d,s.id,w)]=[]; })));
+  (data||[]).forEach(r=>{ if(waitlists[r.key]) waitlists[r.key].push(r.student_id); });
+}
+
+async function setReservation(k, studentId){
+  if(studentId===null){
+    await db.from('reservations').delete().eq('key',k);
+  } else {
+    await db.from('reservations').upsert({key:k,student_id:studentId});
+  }
+}
+
+async function addToWaitlist(k, studentId){
+  const pos=(waitlists[k]||[]).length;
+  await db.from('waitlists').upsert({key:k,student_id:studentId,position:pos});
+}
+
+async function removeFromWaitlist(k, studentId){
+  await db.from('waitlists').delete().eq('key',k).eq('student_id',studentId);
+}
+
+async function getStudentStats(studentId){
+  const now=new Date();
+  const weekAgo=new Date(now); weekAgo.setDate(now.getDate()-7);
+  const monthAgo=new Date(now); monthAgo.setMonth(now.getMonth()-1);
+
+  // count reservations (each slot = 4 hours)
+  const {data:allRes}=await db.from('reservations').select('key').eq('student_id',studentId);
+  const weeklyHours=(allRes||[]).filter(r=>{
+    const parts=r.key.split('|');
+    return DAYS.includes(parts[0]);
+  }).length * 4;
+
+  const {data:nsData}=await db.from('no_shows').select('*').eq('student_id',studentId);
+  const noShowCount=(nsData||[]).length;
+
+  const {data:lastRes}=await db.from('no_shows').select('logged_at').eq('student_id',studentId).order('logged_at',{ascending:false}).limit(1);
+  // Use reservations for last visit — check all historical no_shows
+  // Simple: count current active reservations as proxy
+  const lastVisit = nsData&&nsData.length>0
+    ? new Date(nsData[nsData.length-1].logged_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})
+    : 'no history yet';
+
+  return {weeklyHours, noShowCount, lastVisit};
+}
+
+/* ── EMAIL LOGIN ─────────────────────────────────────────────── */
+async function lookupStudent(){
+  const raw=document.getElementById('email-input').value.trim().toLowerCase();
+  if(!isValidEmail(raw)){ showInfoBanner('please enter a valid email address'); return; }
+  if(isRateLimited('lookup')){ showRateBanner('please wait before trying again'); return; }
+
+  const btn=document.getElementById('lookup-btn-text');
+  btn.innerHTML='<span class="spinner"></span>looking up…';
+  document.querySelector('.btn-primary').disabled=true;
+
+  const {data,error}=await db.from('students').select('*').eq('email',raw).single();
+
+  btn.textContent='continue';
+  document.querySelector('.btn-primary').disabled=false;
+
+  if(error||!data){
+    showInfoBanner('email not found — contact your instructor to be added to the roster');
+    logEvent('login-fail',`Email lookup failed: ${raw}`);
+    return;
+  }
+
+  currentStudent=data;
+  logEvent('login',`Student signed in: ${data.name}`);
+  await enterStudentView();
+}
+
+async function enterStudentView(){
+  await loadReservations();
+  await loadWaitlists();
+
+  // populate greeting
+  document.getElementById('student-greeting').textContent=`welcome, ${currentStudent.name.split(' ')[0].toLowerCase()}`;
+  document.getElementById('student-email-display').textContent=currentStudent.email;
+  const initials=currentStudent.name.split(' ').map(n=>n[0]).join('').toUpperCase();
+  document.getElementById('student-avatar').textContent=initials;
+
+  // load stats
+  const stats=await getStudentStats(currentStudent.id);
+  document.getElementById('student-hours').innerHTML=`
+    <div class="hours-tile"><div class="hours-val">${stats.weeklyHours}</div><div class="hours-label">hrs this week</div></div>
+    <div class="hours-tile"><div class="hours-val">${stats.noShowCount}</div><div class="hours-label">no-shows</div></div>
+    <div class="hours-tile"><div class="hours-val" style="font-size:13px;padding-top:4px">${stats.lastVisit}</div><div class="hours-label">last visit</div></div>`;
+
+  showView('student-view');
+  renderDayTabs();
+  renderSlots();
+}
+
+function signOutStudent(){
+  currentStudent=null;
+  document.getElementById('email-input').value='';
+  showView('email-view');
+  logEvent('logout','Student signed out');
+}
+
+/* ── BOOKING ─────────────────────────────────────────────────── */
 function canBook(day,slotId){
   const now=new Date();
   const dayIdx=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const target=dayIdx.indexOf(day), today=now.getDay();
+  const target=dayIdx.indexOf(day),today=now.getDay();
   const sl=SLOTS.find(s=>s.id===slotId); if(!sl) return false;
   const slotStart=new Date(now);
   slotStart.setDate(now.getDate()+(target-today+7)%7);
@@ -775,10 +473,164 @@ function canBook(day,slotId){
   const diffHrs=(slotStart-now)/3600000;
   return diffHrs<=BOOKING_WINDOW_HRS&&diffHrs>0;
 }
+
 function studentHasBookingToday(day){
-  return SLOTS.some(s=>WHEELS.some(w=>reservations[key(day,s.id,w)]===currentStudent));
+  return SLOTS.some(s=>WHEELS.some(w=>reservations[key(day,s.id,w)]===currentStudent?.id));
 }
 
+async function bookSlot(day,slotId,wheel){
+  if(!currentStudent){ showRateBanner('please sign in first',true); return; }
+  if(isRateLimited('book')){ showRateBanner('please wait before booking again',true); return; }
+  if(isTooManyBookings()){ showRateBanner('too many booking attempts — please wait',true); logEvent('rate-limit','Booking rate limit hit'); return; }
+  if(!canBook(day,slotId)){ showRateBanner('booking window not open yet',true); return; }
+  if(studentHasBookingToday(day)){ showRateBanner('you already have a reservation today',true); return; }
+  const k=key(day,slotId,wheel);
+  if(reservations[k]){ showRateBanner('that slot was just taken',true); return; }
+  const sl=SLOTS.find(s=>s.id===slotId);
+  pendingAction=async()=>{
+    await loadReservations(); // re-check live state
+    if(reservations[k]){ showRateBanner('slot taken while confirming',true); return; }
+    if(studentHasBookingToday(day)){ showRateBanner('you already booked today',true); return; }
+    if(!canBook(day,slotId)){ showRateBanner('window closed',true); return; }
+    await setReservation(k,currentStudent.id);
+    reservations[k]=currentStudent.id;
+    logEvent('booking',`${currentStudent.name} reserved ${wheel} · ${day} ${sl?.label}`);
+    await loadStudentStats();
+    renderSlots();
+  };
+  openModal('confirm reservation',`reserve ${wheel} for the ${sl?.label} slot (${sl?.time}) on ${day}?`,'confirm');
+}
+
+async function cancelRes(day,slotId,wheel){
+  if(isRateLimited('cancel')){ showRateBanner('please wait before cancelling',true); return; }
+  const k=key(day,slotId,wheel);
+  if(reservations[k]!==currentStudent?.id){ logEvent('tamper-attempt','Cancel attempted on unowned slot'); showRateBanner('that reservation is not yours',true); return; }
+  pendingAction=async()=>{
+    await loadReservations();
+    if(reservations[k]!==currentStudent?.id){ showRateBanner('reservation mismatch',true); return; }
+    await setReservation(k,null);
+    reservations[k]=null;
+    clearInterval(countdownIntervals[k]); delete countdownIntervals[k]; delete noShowTimers[k];
+    await promoteWaitlist(k);
+    logEvent('cancel',`${currentStudent.name} cancelled ${wheel} · ${day} ${slotId}`);
+    renderSlots();
+  };
+  openModal('cancel reservation','are you sure you want to cancel your reservation?','yes, cancel');
+}
+
+async function joinWaitlist(day,slotId,wheel){
+  if(!currentStudent) return;
+  if(isRateLimited('waitlist')){ showRateBanner('please wait',true); return; }
+  const k=key(day,slotId,wheel);
+  if((waitlists[k]||[]).includes(currentStudent.id)){ showRateBanner('already on this waitlist',true); return; }
+  if(!waitlists[k]) waitlists[k]=[];
+  waitlists[k].push(currentStudent.id);
+  await addToWaitlist(k,currentStudent.id);
+  logEvent('waitlist',`${currentStudent.name} joined waitlist · ${wheel} ${day} ${slotId}`);
+  renderSlots();
+}
+
+async function promoteWaitlist(k){
+  await loadWaitlists();
+  if(!waitlists[k]||waitlists[k].length===0) return;
+  const [day]=k.split('|');
+  const nextId=waitlists[k].find(id=>!SLOTS.some(s=>WHEELS.some(w=>reservations[key(day,s.id,w)]===id)));
+  if(!nextId){ logEvent('waitlist','No eligible student to promote for '+k); return; }
+  await setReservation(k,nextId);
+  await removeFromWaitlist(k,nextId);
+  reservations[k]=nextId;
+  waitlists[k]=waitlists[k].filter(id=>id!==nextId);
+  const stu=students.find(s=>s.id===nextId);
+  logEvent('promote',`${stu?.name||'student'} promoted from waitlist · ${k}`);
+  showToast((stu?stu.name:'next student')+' promoted from waitlist');
+}
+
+async function loadStudentStats(){
+  if(!currentStudent) return;
+  const stats=await getStudentStats(currentStudent.id);
+  const el=document.getElementById('student-hours');
+  if(el) el.innerHTML=`
+    <div class="hours-tile"><div class="hours-val">${stats.weeklyHours}</div><div class="hours-label">hrs this week</div></div>
+    <div class="hours-tile"><div class="hours-val">${stats.noShowCount}</div><div class="hours-label">no-shows</div></div>
+    <div class="hours-tile"><div class="hours-val" style="font-size:13px;padding-top:4px">${stats.lastVisit}</div><div class="hours-label">last visit</div></div>`;
+}
+
+/* ── NO-SHOW ─────────────────────────────────────────────────── */
+function triggerNoShow(k){
+  if(!requireSession()) return;
+  const stuId=reservations[k];
+  const stu=students.find(s=>s.id===stuId);
+  noShowTimers[k]={end:Date.now()+NOSHOW_RELEASE_MIN*60000};
+  db.from('no_shows').insert({key:k,student_id:stuId});
+  logEvent('no-show',`${stu?.name||'?'} marked no-show · ${k}`);
+  clearInterval(countdownIntervals[k]);
+  countdownIntervals[k]=setInterval(async()=>{
+    const remaining=noShowTimers[k].end-Date.now();
+    const el=document.getElementById('cd-'+k);
+    if(el) el.textContent=remaining>0?Math.ceil(remaining/60000)+'m':'releasing...';
+    if(remaining<=0){
+      clearInterval(countdownIntervals[k]); delete countdownIntervals[k];
+      await setReservation(k,null); reservations[k]=null; delete noShowTimers[k];
+      await promoteWaitlist(k); renderSlots(); renderDash();
+    }
+  },10000);
+  renderSlots(); renderDash();
+}
+
+/* ── RENDER: STUDENT ─────────────────────────────────────────── */
+function renderDayTabs(){
+  document.getElementById('day-tabs').innerHTML=DAYS.map(d=>
+    `<button class="day-tab${d===currentDay?' active':''}" onclick="setDay('${d}')">${d.toLowerCase()}</button>`
+  ).join('');
+}
+function setDay(d){ currentDay=d; renderDayTabs(); renderSlots(); }
+
+function renderSlots(){
+  const area=document.getElementById('slot-area');
+  let html='';
+  SLOTS.forEach(s=>{
+    const bookable=canBook(currentDay,s.id);
+    const allFull=WHEELS.every(w=>reservations[key(currentDay,s.id,w)]!==null);
+    const badge=bookable?(allFull?'<span class="slot-label badge-full">full</span>':'<span class="slot-label badge-open">open</span>'):'<span class="slot-label badge-locked">opens 2 hrs before</span>';
+    html+=`<div class="slot-card"><div class="slot-header"><span class="slot-time">${s.label} · ${s.time}</span>${badge}</div>`;
+    WHEELS.forEach(w=>{
+      const k=key(currentDay,s.id,w),booked=reservations[k],wl=waitlists[k]||[];
+      const isMe=booked===currentStudent?.id,inNS=noShowTimers[k]!==undefined;
+      if(booked){
+        const stu=students.find(st=>st.id===booked);
+        html+=`<div class="wheel-slot ${isMe?'mine':'booked'}">
+          <div><div class="student-name">${esc(stu?.name||'—')}</div><div class="muted">${esc(w)}</div></div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+            ${inNS?`<span class="countdown" id="cd-${k}">releasing soon</span>`:''}
+            ${isMe?`<button class="btn btn-sm btn-danger" onclick="cancelRes('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">cancel</button>`:''}
+          </div>
+        </div>`;
+      } else {
+        let action='';
+        if(bookable&&currentStudent){
+          if(studentHasBookingToday(currentDay)){
+            action='<span class="muted" style="font-size:11px">1/day limit</span>';
+          } else {
+            action=`<button class="btn btn-sm btn-primary" onclick="bookSlot('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">reserve</button>`;
+          }
+        }
+        html+=`<div class="wheel-slot empty"><div><div class="student-name" style="color:var(--ink3)">available</div><div class="muted">${esc(w)}</div></div>${action}</div>`;
+      }
+      if(wl.length>0){
+        const pos=wl.indexOf(currentStudent?.id);
+        html+=`<div style="font-size:11.5px;color:var(--ink3);padding:4px 0 6px 4px">
+          <i class="ti ti-list" aria-hidden="true"></i> waitlist: ${wl.length}${pos>-1?' <strong>· you are #'+(pos+1)+'</strong>':''}
+          ${currentStudent&&pos===-1&&bookable&&!studentHasBookingToday(currentDay)?`<button class="btn btn-sm" style="margin-left:8px;font-size:11px;padding:3px 8px" onclick="joinWaitlist('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">join waitlist</button>`:''}
+        </div>`;
+      }
+    });
+    html+='</div>';
+  });
+  area.innerHTML=html||'<p class="muted">no slots available</p>';
+  restartCountdownDisplays();
+}
+
+/* ── PIN AUTH ─────────────────────────────────────────────────── */
 function onPinInput(){
   const val=document.getElementById('pin-input').value;
   const cleaned=val.replace(/\D/g,'');
@@ -814,193 +666,36 @@ async function checkPin(val){
   }
 }
 
-function startInstructorSession(){
+/* ── SESSION ─────────────────────────────────────────────────── */
+async function startInstructorSession(){
   instructorSession={startedAt:Date.now(),expiresAt:Date.now()+SESSION_TIMEOUT_MS};
   clearInterval(sessionTimer); sessionTimer=setInterval(tickSession,30000);
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('instructor-view').classList.add('active');
-  renderDash(); updateSessionBar();
+  await loadStudents(); await loadReservations(); await loadWaitlists();
+  showView('instructor-view'); renderDash(); updateSessionBar();
 }
 function tickSession(){
   if(!instructorSession) return;
-  if(Date.now()>=instructorSession.expiresAt){
-    logEvent('session','Instructor session expired — auto sign-out');
-    instructorLogout(); showToast('session expired — please sign in again');
-  } else { updateSessionBar(); }
+  if(Date.now()>=instructorSession.expiresAt){ logEvent('session','Session expired'); instructorLogout(); showToast('session expired'); }
+  else updateSessionBar();
 }
 function updateSessionBar(){
   if(!instructorSession) return;
-  const remaining=Math.max(0,Math.ceil((instructorSession.expiresAt-Date.now())/60000));
-  document.getElementById('session-bar').textContent=`session expires in ${remaining} min`;
+  const r=Math.max(0,Math.ceil((instructorSession.expiresAt-Date.now())/60000));
+  document.getElementById('session-bar').textContent=`session expires in ${r} min`;
 }
-function instructorLogout(){
-  clearInterval(sessionTimer); sessionTimer=null; instructorSession=null;
-  logEvent('auth-logout','Instructor signed out'); showStudent();
-}
+function instructorLogout(){ clearInterval(sessionTimer); sessionTimer=null; instructorSession=null; logEvent('auth-logout','Instructor signed out'); showView('email-view'); }
 function requireSession(){
   if(!instructorSession||Date.now()>=instructorSession.expiresAt){ instructorLogout(); return false; }
   return true;
 }
 
-function showPinView(){
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('lockout-banner').style.display='none';
-  document.getElementById('pin-error').textContent='';
-  document.getElementById('pin-input').value='';
-  document.getElementById('pin-view').classList.add('active');
-}
-function showStudent(){
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('student-view').classList.add('active');
-}
+/* ── NAVIGATION ──────────────────────────────────────────────── */
+function showView(id){ document.querySelectorAll('.view').forEach(v=>v.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function showPinView(){ document.getElementById('lockout-banner').style.display='none'; document.getElementById('pin-error').textContent=''; document.getElementById('pin-input').value=''; showView('pin-view'); }
+function showEmailView(){ showView('email-view'); }
 
-function onStudentSelect(){
-  const val=document.getElementById('student-select').value;
-  if(val&&isRateLimited('select')){ showRateBanner('please wait before switching'); return; }
-  currentStudent=val||null;
-  if(currentStudent) logEvent('login','Student selected: '+students.find(s=>s.id===currentStudent)?.name);
-  renderSlots();
-}
-
-function bookSlot(day,slotId,wheel){
-  if(!currentStudent){ showRateBanner('select your name first'); return; }
-  if(isRateLimited('book')){ showRateBanner('please wait before booking again'); return; }
-  if(isTooManyBookings()){ showRateBanner('too many booking attempts — please wait'); logEvent('rate-limit','Booking rate limit hit'); return; }
-  if(!canBook(day,slotId)){ showRateBanner('booking window not open yet'); return; }
-  if(studentHasBookingToday(day)){ showRateBanner('you already have a reservation today'); return; }
-  const k=key(day,slotId,wheel);
-  if(reservations[k]){ showRateBanner('that slot was just taken'); return; }
-  const sl=SLOTS.find(s=>s.id===slotId);
-  const stuName=students.find(s=>s.id===currentStudent)?.name;
-  pendingAction=()=>{
-    if(reservations[k]){ showRateBanner('slot taken while confirming'); return; }
-    if(studentHasBookingToday(day)){ showRateBanner('you already booked today'); return; }
-    if(!canBook(day,slotId)){ showRateBanner('window closed'); return; }
-    reservations[k]=currentStudent;
-    logEvent('booking',`${stuName} reserved ${wheel} · ${day} ${sl?.label}`);
-    renderSlots(); renderDash();
-  };
-  openModal('confirm reservation',`reserve ${wheel} for the ${sl?.label} slot (${sl?.time}) on ${day}?`,'confirm');
-}
-
-function cancelRes(day,slotId,wheel){
-  if(isRateLimited('cancel')){ showRateBanner('please wait before cancelling'); return; }
-  const k=key(day,slotId,wheel);
-  if(reservations[k]!==currentStudent){ logEvent('tamper-attempt','Cancel attempted on slot not owned by student'); showRateBanner('that reservation is not yours'); return; }
-  const stuName=students.find(s=>s.id===currentStudent)?.name;
-  pendingAction=()=>{
-    if(reservations[k]!==currentStudent){ showRateBanner('reservation mismatch'); return; }
-    reservations[k]=null; clearInterval(countdownIntervals[k]);
-    delete countdownIntervals[k]; delete noShowTimers[k];
-    promoteWaitlist(k);
-    logEvent('cancel',`${stuName} cancelled ${wheel} · ${day} ${slotId}`);
-    renderSlots(); renderDash();
-  };
-  openModal('cancel reservation','are you sure you want to cancel your reservation?','yes, cancel');
-}
-
-function joinWaitlist(day,slotId,wheel){
-  if(!currentStudent) return;
-  if(isRateLimited('waitlist')){ showRateBanner('please wait before joining another waitlist'); return; }
-  const k=key(day,slotId,wheel);
-  if(waitlists[k].includes(currentStudent)){ showRateBanner('already on this waitlist'); return; }
-  waitlists[k].push(currentStudent);
-  logEvent('waitlist',`${students.find(s=>s.id===currentStudent)?.name} joined waitlist · ${wheel} ${day} ${slotId}`);
-  renderSlots();
-}
-
-function promoteWaitlist(k){
-  if(waitlists[k]?.length>0){
-    const [day]=k.split('|');
-    const nextIdx=waitlists[k].findIndex(id=>!SLOTS.some(s=>WHEELS.some(w=>reservations[key(day,s.id,w)]===id)));
-    if(nextIdx===-1){ logEvent('waitlist','No eligible student to promote for '+k); return; }
-    const [next]=waitlists[k].splice(nextIdx,1);
-    reservations[k]=next;
-    const stu=students.find(s=>s.id===next);
-    logEvent('promote',`${stu?.name||'student'} promoted from waitlist · ${k}`);
-    showToast((stu?stu.name:'next student')+' promoted from waitlist');
-  }
-}
-
-function triggerNoShow(k){
-  if(!requireSession()) return;
-  const stuId=reservations[k], stu=students.find(s=>s.id===stuId);
-  noShowTimers[k]={end:Date.now()+NOSHOW_RELEASE_MIN*60000};
-  logEvent('no-show',`${stu?.name||'?'} marked no-show · ${k}`);
-  noShows.push({key:k,student:stuId,time:new Date().toLocaleTimeString()});
-  clearInterval(countdownIntervals[k]);
-  countdownIntervals[k]=setInterval(()=>{
-    const remaining=noShowTimers[k].end-Date.now();
-    const el=document.getElementById('cd-'+k);
-    if(el) el.textContent=remaining>0?Math.ceil(remaining/60000)+'m':'releasing...';
-    if(remaining<=0){
-      clearInterval(countdownIntervals[k]); delete countdownIntervals[k];
-      reservations[k]=null; delete noShowTimers[k];
-      promoteWaitlist(k); renderSlots(); renderDash();
-    }
-  },10000);
-  renderSlots(); renderDash();
-}
-
-function renderDayTabs(){
-  document.getElementById('day-tabs').innerHTML=DAYS.map(d=>
-    `<button class="day-tab${d===currentDay?' active':''}" onclick="setDay('${d}')" role="tab" aria-selected="${d===currentDay}">${d.toLowerCase()}</button>`
-  ).join('');
-}
-function setDay(d){ currentDay=d; renderDayTabs(); renderSlots(); }
-
-function renderSlots(){
-  const area=document.getElementById('slot-area');
-  let html='';
-  SLOTS.forEach(s=>{
-    const bookable=canBook(currentDay,s.id);
-    const allFull=WHEELS.every(w=>reservations[key(currentDay,s.id,w)]!==null);
-    const badge=bookable
-      ?(allFull?'<span class="slot-label badge-full">full</span>':'<span class="slot-label badge-open">open</span>')
-      :'<span class="slot-label badge-locked">opens 2 hrs before</span>';
-    html+=`<div class="slot-card"><div class="slot-header"><span class="slot-time">${s.label} · ${s.time}</span>${badge}</div>`;
-    WHEELS.forEach(w=>{
-      const k=key(currentDay,s.id,w), booked=reservations[k], wl=waitlists[k]||[];
-      const isMe=booked===currentStudent, inNS=noShowTimers[k]!==undefined;
-      if(booked){
-        const stu=students.find(st=>st.id===booked);
-        html+=`<div class="wheel-slot ${isMe?'mine':'booked'}">
-          <div><div class="student-name">${esc(stu?.name||'—')}</div><div class="muted">${esc(w)}</div></div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-            ${inNS?`<span class="countdown" id="cd-${k}">releasing soon</span>`:''}
-            ${isMe?`<button class="btn btn-sm btn-danger" onclick="cancelRes('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">cancel</button>`:''}
-          </div>
-        </div>`;
-      } else {
-        let action='';
-        if(bookable&&currentStudent){
-          if(studentHasBookingToday(currentDay)){
-            action='<span class="muted" style="font-size:11px">1/day limit</span>';
-          } else {
-            action=`<button class="btn btn-sm btn-primary" onclick="bookSlot('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">reserve</button>`;
-          }
-        }
-        html+=`<div class="wheel-slot empty"><div><div class="student-name" style="color:var(--ink3)">available</div><div class="muted">${esc(w)}</div></div>${action}</div>`;
-      }
-      if(wl.length>0){
-        const pos=wl.indexOf(currentStudent);
-        html+=`<div style="font-size:11.5px;color:var(--ink3);padding:4px 0 6px 4px">
-          <i class="ti ti-list" aria-hidden="true"></i> waitlist: ${wl.length}${pos>-1?' <strong>· you are #'+(pos+1)+'</strong>':''}
-          ${currentStudent&&pos===-1&&bookable&&!studentHasBookingToday(currentDay)?`<button class="btn btn-sm" style="margin-left:8px;font-size:11px;padding:3px 8px" onclick="joinWaitlist('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">join waitlist</button>`:''}
-        </div>`;
-      }
-    });
-    html+='</div>';
-  });
-  area.innerHTML=html||'<p class="muted">no slots available</p>';
-  restartCountdownDisplays();
-}
-
-function esc(str){
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-function renderDash(){
+/* ── INSTRUCTOR RENDER ───────────────────────────────────────── */
+async function renderDash(){
   if(!requireSession()) return;
   let total=0,booked=0,wlCount=0;
   DAYS.forEach(d=>SLOTS.forEach(s=>WHEELS.forEach(w=>{
@@ -1017,9 +712,9 @@ function renderDash(){
   DAYS.forEach(d=>{
     todayHtml+=`<div class="section-label">${esc(d)}</div>`;
     SLOTS.forEach(s=>WHEELS.forEach(w=>{
-      const k=key(d,s.id,w), bId=reservations[k];
+      const k=key(d,s.id,w),bId=reservations[k];
       const stu=bId?students.find(st=>st.id===bId):null;
-      const wl=waitlists[k]||[], isNS=noShowTimers[k]!==undefined;
+      const wl=waitlists[k]||[],isNS=noShowTimers[k]!==undefined;
       todayHtml+=`<div class="card" style="margin-bottom:8px">
         <div class="flex-between" style="margin-bottom:6px">
           <span style="font-size:13px;font-weight:500">${esc(w)} · ${esc(s.label)}</span>
@@ -1028,7 +723,7 @@ function renderDash(){
         ${stu?`<div class="flex-between">
           <div style="display:flex;align-items:center;gap:8px">
             <div class="avatar">${esc(stu.name.split(' ').map(n=>n[0]).join(''))}</div>
-            <span class="student-name">${esc(stu.name)}</span>
+            <div><div class="student-name">${esc(stu.name)}</div><div class="muted">${esc(stu.email||'')}</div></div>
             ${isNS?`<span class="countdown" id="cd-${k}">timer</span>`:''}
           </div>
           <div style="display:flex;gap:6px">
@@ -1043,31 +738,35 @@ function renderDash(){
   document.getElementById('dash-today').innerHTML=todayHtml;
   restartCountdownDisplays();
 
+  // roster with stats
   let rosterHtml='<div class="card">';
-  students.forEach(s=>{
-    const bookings=[];
-    DAYS.forEach(d=>SLOTS.forEach(sl=>WHEELS.forEach(w=>{
-      if(reservations[key(d,sl.id,w)]===s.id) bookings.push(d+' '+sl.label);
-    })));
+  for(const s of students){
+    const stats=await getStudentStats(s.id);
     rosterHtml+=`<div class="roster-row">
       <div style="display:flex;align-items:center;gap:10px">
         <div class="avatar">${esc(s.name.split(' ').map(n=>n[0]).join(''))}</div>
-        <div><div class="student-name">${esc(s.name)}</div><div class="muted">${bookings.length?bookings.map(esc).join(', '):'no bookings'}</div></div>
+        <div>
+          <div class="student-name">${esc(s.name)}</div>
+          <div class="muted">${esc(s.email||'')} · ${stats.weeklyHours}h this week · ${stats.noShowCount} no-shows</div>
+        </div>
       </div>
       <button class="btn btn-sm btn-danger" onclick="removeStudent('${esc(s.id)}')">remove</button>
     </div>`;
-  });
-  rosterHtml+=`<div style="margin-top:10px;display:flex;gap:8px">
-    <input type="text" id="new-student-name" placeholder="add student name…" maxlength="${MAX_NAME_LEN}" style="flex:1" autocomplete="off">
+  }
+  rosterHtml+=`<div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
+    <input type="text" id="new-student-name" placeholder="full name" maxlength="40" autocomplete="off">
+    <input type="email" id="new-student-email" placeholder="email" autocomplete="off">
     <button class="btn btn-sm btn-primary" onclick="addStudent()">add</button>
   </div></div>`;
   document.getElementById('dash-roster').innerHTML=rosterHtml;
 
-  const nsHtml=noShows.length===0
+  // no-shows from db
+  const {data:nsData}=await db.from('no_shows').select('*,students(name)').order('logged_at',{ascending:false}).limit(30);
+  const nsHtml=!nsData||nsData.length===0
     ?'<p class="muted">no no-shows recorded.</p>'
-    :noShows.map(ns=>{
-        const stu=students.find(s=>s.id===ns.student), parts=ns.key.split('|');
-        return `<div class="no-show-row"><i class="ti ti-alert-triangle" aria-hidden="true" style="color:var(--amber)"></i><span><strong>${esc(stu?.name||'unknown')}</strong> · ${esc(parts[0])} ${esc(parts[1])} · ${esc(ns.time)}</span></div>`;
+    :(nsData||[]).map(ns=>{
+        const parts=ns.key.split('|');
+        return `<div class="no-show-row"><i class="ti ti-alert-triangle" aria-hidden="true" style="color:var(--amber)"></i><span><strong>${esc(ns.students?.name||'unknown')}</strong> · ${esc(parts[0])} ${esc(parts[1])} · ${new Date(ns.logged_at).toLocaleString()}</span></div>`;
       }).join('');
   document.getElementById('dash-noshows').innerHTML=nsHtml;
 
@@ -1076,47 +775,42 @@ function renderDash(){
     <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">students can book up to 2 hours before each slot.</p>
     <div class="section-label">no-show window</div>
     <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">slot releases after 30 minutes. next eligible student on waitlist is promoted.</p>
-    <div class="section-label">rate limiting</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">3-second cooldown between actions. max 10 bookings per 5 minutes per session.</p>
-    <div class="section-label">session timeout</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">instructor dashboard auto-signs out after 20 minutes.</p>
-    <div class="section-label">pin lockout</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">5 wrong attempts locks the pin screen for 5 minutes.</p>
+    <div class="section-label">weekly auto-reset</div>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">all reservations clear automatically each sunday night when a student first loads the app.</p>
     <div class="section-label">change pin</div>
     <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">pin is stored as a sha-256 hash — never in plaintext.</p>
     <div style="display:flex;gap:8px;margin-top:6px">
       <input type="password" id="new-pin" placeholder="new pin (4–6 digits)" maxlength="6" inputmode="numeric" style="width:180px" autocomplete="new-password">
       <button class="btn btn-sm btn-primary" onclick="changePIN()">save</button>
     </div>
-    <div id="pin-saved" style="font-size:12px;color:#2d6e3a;margin-top:6px;display:none"><i class="ti ti-check" aria-hidden="true"></i> pin hash updated — copy new hash to HASHED_PIN constant</div>
+    <div id="pin-saved" style="font-size:12px;color:var(--green);margin-top:6px;display:none"><i class="ti ti-check" aria-hidden="true"></i> pin hash updated</div>
     <div id="pin-hash-out" style="font-size:11px;color:var(--ink3);margin-top:4px;font-family:monospace;word-break:break-all;display:none"></div>
+    <div class="section-label" style="margin-top:16px">manual weekly reset</div>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">clear all reservations and waitlists now.</p>
+    <button class="btn btn-sm btn-danger" onclick="manualReset()">clear all reservations</button>
   </div>`;
 }
 
 function renderSecurityLog(){
   if(!requireSession()) return;
-  const typeClass={'auth-success':'log-ok','promote':'log-ok','booking':'log-ok','auth-fail':'log-fail','lockout':'log-fail','tamper-attempt':'log-fail','integrity-warn':'log-fail','rate-limit':'log-fail','no-show':'log-warn','cancel':'log-warn','admin-cancel':'log-warn','session':'log-warn','auth-logout':'log-warn'};
-  const html=securityLog.length===0
-    ?'<p class="muted" style="padding:.5rem">no events yet.</p>'
-    :securityLog.map(e=>`<div class="${typeClass[e.type]||''}">[${esc(e.time)}] <strong>${esc(e.type)}</strong> — ${esc(e.detail)}</div>`).join('');
+  const typeClass={'auth-success':'log-ok','promote':'log-ok','booking':'log-ok','auth-fail':'log-fail','lockout':'log-fail','tamper-attempt':'log-fail','rate-limit':'log-fail','no-show':'log-warn','cancel':'log-warn','admin-cancel':'log-warn','session':'log-warn','auth-logout':'log-warn'};
+  const html=securityLog.length===0?'<p class="muted" style="padding:.5rem">no events yet.</p>':securityLog.map(e=>`<div class="${typeClass[e.type]||''}">[${esc(e.time)}] <strong>${esc(e.type)}</strong> — ${esc(e.detail)}</div>`).join('');
   document.getElementById('dash-security').innerHTML=`
     <div class="section-label">event log (last ${MAX_LOG_ENTRIES} actions)</div>
-    <div class="security-log" role="log" aria-live="polite">${html}</div>
+    <div class="security-log" role="log">${html}</div>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="btn btn-sm btn-danger" onclick="clearLog()">clear log</button>
       <button class="btn btn-sm" onclick="exportLog()"><i class="ti ti-download" aria-hidden="true"></i> export csv</button>
     </div>`;
 }
 
-function clearLog(){ if(!requireSession()) return; securityLog=[]; renderSecurityLog(); logEvent('log-cleared','Instructor cleared security log'); }
-
+function clearLog(){ if(!requireSession()) return; securityLog=[]; renderSecurityLog(); logEvent('log-cleared','Instructor cleared log'); }
 function exportLog(){
   if(!requireSession()) return;
   const csv=['time,isoTime,type,detail',...securityLog.map(e=>`"${e.time}","${e.isoTime}","${e.type}","${e.detail}"`)].join('\n');
-  const blob=new Blob([csv],{type:'text/csv'});
-  const url=URL.createObjectURL(blob);
+  const blob=new Blob([csv],{type:'text/csv'}), url=URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=url; a.download='kinsal-log.csv'; a.click();
-  URL.revokeObjectURL(url); logEvent('log-export','Instructor exported security log');
+  URL.revokeObjectURL(url); logEvent('log-export','Instructor exported log');
 }
 
 async function changePIN(){
@@ -1130,35 +824,53 @@ async function changePIN(){
   logEvent('pin-change','Instructor generated new PIN hash');
 }
 
-function adminCancel(k){
+async function manualReset(){
   if(!requireSession()) return;
-  reservations[k]=null; clearInterval(countdownIntervals[k]);
-  delete countdownIntervals[k]; delete noShowTimers[k];
-  promoteWaitlist(k); logEvent('admin-cancel','Instructor cancelled slot '+k);
+  pendingAction=async()=>{
+    await db.from('reservations').delete().neq('key','__none__');
+    await db.from('waitlists').delete().neq('key','__none__');
+    await loadReservations(); await loadWaitlists();
+    logEvent('manual-reset','Instructor manually cleared all reservations');
+    showToast('all reservations cleared'); renderDash();
+  };
+  openModal('clear all reservations','this will remove every reservation and waitlist entry. cannot be undone.','yes, clear all');
+}
+
+async function adminCancel(k){
+  if(!requireSession()) return;
+  await setReservation(k,null); reservations[k]=null;
+  clearInterval(countdownIntervals[k]); delete countdownIntervals[k]; delete noShowTimers[k];
+  await promoteWaitlist(k); logEvent('admin-cancel','Instructor cancelled slot '+k);
   renderDash(); renderSlots();
 }
 
-function removeStudent(id){
+async function removeStudent(id){
   if(!requireSession()) return;
   const stu=students.find(s=>s.id===id);
+  await db.from('students').delete().eq('id',id);
   students=students.filter(s=>s.id!==id);
   Object.keys(reservations).forEach(k=>{ if(reservations[k]===id) reservations[k]=null; });
-  Object.keys(waitlists).forEach(k=>{ waitlists[k]=waitlists[k].filter(s=>s!==id); });
-  if(currentStudent===id){ currentStudent=null; document.getElementById('student-select').value=''; }
   logEvent('roster',`Removed student: ${stu?.name}`);
-  populateRoster(); renderDash(); renderSlots();
+  renderDash();
 }
 
-function addStudent(){
+async function addStudent(){
   if(!requireSession()) return;
-  const inp=document.getElementById('new-student-name');
-  const name=sanitize(inp.value);
-  if(!isValidName(name)){ showToast('enter a valid name (letters only, 2–40 chars)'); return; }
+  const nameInp=document.getElementById('new-student-name');
+  const emailInp=document.getElementById('new-student-email');
+  const name=sanitize(nameInp.value);
+  const email=emailInp.value.trim().toLowerCase();
+  if(!isValidName(name)){ showToast('enter a valid name'); return; }
+  if(!isValidEmail(email)){ showToast('enter a valid email'); return; }
   if(students.length>=MAX_STUDENTS){ showToast('roster limit reached'); return; }
-  if(students.some(s=>s.name.toLowerCase()===name.toLowerCase())){ showToast('student already exists'); return; }
-  const id='s'+Date.now(); students.push({id,name}); inp.value='';
+  if(students.some(s=>s.email===email)){ showToast('email already registered'); return; }
+  const id='s'+Date.now();
+  const {error}=await db.from('students').insert({id,name,email});
+  if(error){ showToast('error adding student — try again'); logEvent('db-error',error.message); return; }
+  students.push({id,name,email});
+  nameInp.value=''; emailInp.value='';
   logEvent('roster','Added student: '+name);
-  populateRoster(); renderDash(); renderSlots();
+  renderDash();
 }
 
 function showDashTab(tab,btn){
@@ -1171,6 +883,7 @@ function showDashTab(tab,btn){
   if(tab==='security') renderSecurityLog();
 }
 
+/* ── MODAL ───────────────────────────────────────────────────── */
 function openModal(title,body,confirmLabel){
   document.getElementById('modal-title').textContent=title;
   document.getElementById('modal-body').textContent=body;
@@ -1190,13 +903,6 @@ function showToast(msg){
   setTimeout(()=>t.remove(),3500);
 }
 
-function populateRoster(){
-  const sel=document.getElementById('student-select'), cur=sel.value;
-  sel.innerHTML='<option value="">— select your name —</option>';
-  students.forEach(s=>{ const o=document.createElement('option'); o.value=s.id; o.textContent=s.name; sel.appendChild(o); });
-  sel.value=cur;
-}
-
 function restartCountdownDisplays(){
   Object.keys(noShowTimers).forEach(k=>{
     const el=document.getElementById('cd-'+k), remaining=noShowTimers[k].end-Date.now();
@@ -1204,9 +910,13 @@ function restartCountdownDisplays(){
   });
 }
 
-populateRoster(); renderDayTabs(); renderSlots();
-logEvent('system','Kinsal studio management loaded');
-integrityCheck();
+/* ── INIT ────────────────────────────────────────────────────── */
+async function init(){
+  await checkWeeklyReset();
+  await loadStudents();
+  logEvent('system','Kinsal loaded');
+}
+init();
 </script>
 </body>
 </html>
