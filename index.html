@@ -387,8 +387,8 @@ function canBookClientSide(day,slotId){
   slotStart.setDate(now.getDate()+diff);
   slotStart.setHours(sl.start,0,0,0);
   const cutoff=new Date(slotStart);
-  cutoff.setHours(sl.end-1,0,0,0); // 1 hour before end
-  const diffHrs=(slotStart-now)/3600000;
+  cutoff.setHours(sl.end-1,0,0,0);
+  if(diff===0&&now<cutoff) return true;
   // same day: open if we haven't hit the cutoff yet
   if(diff===0 && now<cutoff) return true;
   // future day: open within 2 hours before start
