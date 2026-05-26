@@ -18,7 +18,6 @@
   --green:#2d6e3a;--green-light:#e6f0e8;
   --font-head:'Playfair Display','Georgia',serif;
   --font-body:'DM Sans',system-ui,sans-serif;
-  --r1:6px;--r2:11px;--r3:16px;
 }
 body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.038;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
@@ -27,14 +26,14 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opac
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
   background-size:100px 100px;}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;font-weight:400;line-height:1.6;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
 .app{max-width:660px;margin:0 auto;padding:1.75rem 1.25rem 3rem;position:relative;z-index:1}
 .view{display:none}.view.active{display:block}
 .top-bar{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.75rem}
 .logo{font-family:var(--font-head);font-size:22px;font-weight:500;color:var(--ink);letter-spacing:-0.01em;line-height:1.2}
 .logo-sub{display:block;font-family:var(--font-body);font-size:11px;font-weight:300;color:var(--ink3);letter-spacing:0.12em;text-transform:lowercase;margin-top:2px}
 .security-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 8px;border-radius:20px;background:var(--bg3);color:var(--ink3);font-weight:400;letter-spacing:0.04em;margin-left:10px;vertical-align:middle}
-.btn{padding:8px 18px;border-radius:9px 8px 10px 8px;border:1px solid var(--border2);background:var(--surface);color:var(--ink2);font-size:13px;font-family:var(--font-body);font-weight:400;cursor:pointer;transition:background .18s,border-color .18s;letter-spacing:0.01em;text-transform:lowercase}
+.btn{padding:8px 18px;border-radius:9px 8px 10px 8px;border:1px solid var(--border2);background:var(--surface);color:var(--ink2);font-size:13px;font-family:var(--font-body);font-weight:400;cursor:pointer;transition:background .18s;letter-spacing:0.01em;text-transform:lowercase}
 .btn:hover{background:var(--bg2)}.btn:disabled{opacity:.4;cursor:not-allowed}
 .btn-primary{background:var(--blue);color:#fff;border-color:var(--blue);border-radius:8px 10px 9px 9px}
 .btn-primary:hover{background:var(--blue-dark)}
@@ -45,7 +44,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-siz
 .rule-box{background:var(--bg2);border-radius:10px 11px 10px 12px;border:1px solid var(--border);padding:.8rem 1rem;font-size:12.5px;color:var(--ink3);margin-bottom:1.25rem;line-height:2}
 .rule-box i{color:var(--ink3);margin-right:7px;font-size:13px}
 .day-tabs{display:flex;gap:7px;margin-bottom:1.25rem;flex-wrap:wrap}
-.day-tab{padding:5px 14px;border-radius:8px 9px 8px 10px;border:1px solid var(--border);background:var(--surface);color:var(--ink3);font-size:12.5px;font-family:var(--font-body);cursor:pointer;transition:all .15s;text-transform:lowercase;letter-spacing:0.01em}
+.day-tab{padding:5px 14px;border-radius:8px 9px 8px 10px;border:1px solid var(--border);background:var(--surface);color:var(--ink3);font-size:12.5px;font-family:var(--font-body);cursor:pointer;transition:all .15s;text-transform:lowercase}
 .day-tab:hover{background:var(--bg2);color:var(--ink2)}
 .day-tab.active{background:var(--blue-light);color:var(--blue-text);border-color:rgba(58,114,196,0.3);font-weight:500}
 .slot-card{background:var(--surface);border:1px solid var(--border);border-radius:13px 12px 14px 12px;padding:1rem 1.1rem;margin-bottom:10px}
@@ -55,14 +54,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-siz
 .badge-open{background:var(--green-light);color:var(--green);border:1px solid rgba(45,110,58,0.2)}
 .badge-full{background:var(--red-light);color:var(--red);border:1px solid rgba(140,44,30,0.18)}
 .badge-locked{background:var(--bg3);color:var(--ink3);border:1px solid var(--border)}
-.wheel-slot{padding:9px 11px;border-radius:8px 9px 8px 9px;border:1px solid var(--border);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;font-size:13px;transition:border-color .15s}
+.wheel-slot{padding:9px 11px;border-radius:8px 9px 8px 9px;border:1px solid var(--border);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;font-size:13px}
 .wheel-slot.booked{background:var(--green-light);border-color:rgba(45,110,58,0.25)}
 .wheel-slot.mine{background:var(--blue-light);border-color:rgba(58,114,196,0.3)}
 .wheel-slot.empty{background:var(--bg2)}
 .student-name{font-weight:500;font-size:13px;color:var(--ink)}
 .muted{color:var(--ink3);font-size:11.5px}
 .countdown{font-size:10.5px;color:var(--amber);font-weight:500;background:var(--amber-light);padding:2px 8px;border-radius:20px;border:1px solid rgba(122,72,0,0.18)}
-.section-label{font-family:var(--font-body);font-size:10px;font-weight:500;color:var(--ink3);text-transform:lowercase;letter-spacing:0.1em;margin-bottom:7px;margin-top:16px}
+.section-label{font-size:10px;font-weight:500;color:var(--ink3);text-transform:lowercase;letter-spacing:0.1em;margin-bottom:7px;margin-top:16px}
 .pin-screen{max-width:300px;margin:3rem auto;text-align:center}
 .pin-screen-title{font-family:var(--font-head);font-size:20px;font-weight:500;color:var(--ink);margin-top:.75rem;letter-spacing:-0.01em}
 .pin-input{width:100%;padding:13px;font-size:22px;letter-spacing:.35em;text-align:center;border-radius:10px 11px 10px 12px;border:1px solid var(--border2);background:var(--surface);color:var(--ink);font-family:monospace;margin:1rem 0}
@@ -90,10 +89,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-siz
 .modal p{font-size:13px;color:var(--ink2);margin-bottom:1.1rem;line-height:1.55}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end}
 .toast-container{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:100;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:6px}
-.toast{background:var(--ink);color:var(--bg);padding:9px 18px;border-radius:9px 10px 9px 10px;font-size:12.5px;white-space:nowrap;animation:fadeUp .2s ease;letter-spacing:0.01em}
+.toast{background:var(--ink);color:var(--bg);padding:9px 18px;border-radius:9px 10px 9px 10px;font-size:12.5px;white-space:nowrap;animation:fadeUp .2s ease}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.session-bar{font-size:11px;color:var(--ink3);text-align:right;margin-bottom:6px;letter-spacing:0.03em}
-input[type=text],input[type=password],input[type=email],input[type=number]{padding:9px 12px;border-radius:8px 9px 8px 9px;border:1px solid var(--border2);background:var(--surface);color:var(--ink);font-size:13.5px;font-family:var(--font-body)}
+.session-bar{font-size:11px;color:var(--ink3);text-align:right;margin-bottom:6px}
+input[type=text],input[type=password],input[type=email]{padding:9px 12px;border-radius:8px 9px 8px 9px;border:1px solid var(--border2);background:var(--surface);color:var(--ink);font-size:13.5px;font-family:var(--font-body)}
 .flex-between{display:flex;align-items:center;justify-content:space-between}
 .email-screen{max-width:320px;margin:3rem auto;text-align:center}
 .email-input{width:100%;padding:11px 13px;border-radius:10px 11px 10px 11px;border:1px solid var(--border2);background:var(--surface);color:var(--ink);font-size:14px;font-family:var(--font-body);margin:1rem 0;text-align:center}
@@ -102,16 +101,15 @@ input[type=text],input[type=password],input[type=email],input[type=number]{paddi
 .hours-tile{background:var(--bg2);border-radius:9px 10px 9px 10px;border:1px solid var(--border);padding:.7rem .8rem;text-align:center}
 .hours-val{font-family:var(--font-head);font-size:20px;font-weight:400;color:var(--ink);letter-spacing:-0.02em}
 .hours-label{font-size:10.5px;color:var(--ink3);margin-top:2px;text-transform:lowercase}
-.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
 @keyframes spin{to{transform:rotate(360deg)}}
-.loading-state{text-align:center;padding:2rem;color:var(--ink3);font-size:13px}
 </style>
 </head>
 <body>
-<div class="app" id="app">
+<div class="app">
 <div class="toast-container" id="toast-container"></div>
 
-<!-- EMAIL LOGIN VIEW -->
+<!-- EMAIL LOGIN -->
 <div id="email-view" class="view active">
   <div class="top-bar">
     <div>
@@ -120,25 +118,18 @@ input[type=text],input[type=password],input[type=email],input[type=number]{paddi
     </div>
     <button class="btn btn-sm" onclick="showPinView()"><i class="ti ti-lock" aria-hidden="true"></i> instructor</button>
   </div>
-  <div id="rate-banner" class="rate-banner" role="alert" aria-live="polite">
-    <i class="ti ti-alert-triangle" aria-hidden="true"></i> <span id="rate-msg">slow down — please wait before trying again</span>
-  </div>
-  <div id="info-banner" class="info-banner" role="status" aria-live="polite">
-    <i class="ti ti-info-circle" aria-hidden="true"></i> <span id="info-msg"></span>
-  </div>
+  <div id="rate-banner" class="rate-banner" role="alert" aria-live="polite"><i class="ti ti-alert-triangle" aria-hidden="true"></i> <span id="rate-msg">slow down — please wait</span></div>
+  <div id="info-banner" class="info-banner" role="status" aria-live="polite"><i class="ti ti-info-circle" aria-hidden="true"></i> <span id="info-msg"></span></div>
   <div class="email-screen">
     <div class="logo" style="font-size:28px;margin-bottom:.5rem">kinsal</div>
     <p style="font-size:13px;color:var(--ink3);margin-bottom:.25rem">enter your email to reserve a wheel</p>
-    <input class="email-input" type="email" id="email-input" placeholder="you@example.com"
-      autocomplete="email" inputmode="email" aria-label="Your email address">
-    <button class="btn btn-primary btn-full" onclick="lookupStudent()">
-      <span id="lookup-btn-text">continue</span>
-    </button>
+    <input class="email-input" type="email" id="email-input" placeholder="you@example.com" autocomplete="email" inputmode="email" aria-label="Your email address">
+    <button class="btn btn-primary btn-full" id="lookup-btn" onclick="lookupStudent()">continue</button>
     <p style="font-size:11.5px;color:var(--ink3);margin-top:1rem">not registered? contact your instructor.</p>
   </div>
 </div>
 
-<!-- STUDENT BOOKING VIEW -->
+<!-- STUDENT VIEW -->
 <div id="student-view" class="view">
   <div class="top-bar">
     <div>
@@ -147,12 +138,8 @@ input[type=text],input[type=password],input[type=email],input[type=number]{paddi
     </div>
     <button class="btn btn-sm" onclick="signOutStudent()"><i class="ti ti-logout" aria-hidden="true"></i> sign out</button>
   </div>
-  <div id="rate-banner-2" class="rate-banner" role="alert" aria-live="polite">
-    <i class="ti ti-alert-triangle" aria-hidden="true"></i> <span id="rate-msg-2">slow down</span>
-  </div>
-
-  <!-- student stats card -->
-  <div class="student-card" id="student-stats-card">
+  <div id="rate-banner-2" class="rate-banner" role="alert" aria-live="polite"><i class="ti ti-alert-triangle" aria-hidden="true"></i> <span id="rate-msg-2">slow down</span></div>
+  <div class="student-card">
     <div class="flex-between" style="margin-bottom:8px">
       <div>
         <div style="font-family:var(--font-head);font-size:17px;font-weight:500;color:var(--ink)" id="student-greeting">welcome</div>
@@ -162,7 +149,6 @@ input[type=text],input[type=password],input[type=email],input[type=number]{paddi
     </div>
     <div class="hours-grid" id="student-hours"></div>
   </div>
-
   <div class="rule-box" role="note">
     <div><i class="ti ti-clock" aria-hidden="true"></i>reserve up to 2 hours before each slot</div>
     <div><i class="ti ti-user-off" aria-hidden="true"></i>no-shows released after 30 minutes</div>
@@ -179,14 +165,10 @@ input[type=text],input[type=password],input[type=email],input[type=number]{paddi
     <div class="logo" style="font-size:26px">kinsal</div>
     <div class="pin-screen-title">instructor access</div>
     <p class="muted" style="margin-top:5px;font-size:12.5px">enter your pin to continue</p>
-    <div id="lockout-banner" class="lockout-banner" role="alert">
-      <i class="ti ti-lock" aria-hidden="true"></i> <span id="lockout-msg">too many attempts — locked</span>
-    </div>
-    <input class="pin-input" type="password" maxlength="6" id="pin-input"
-      placeholder="••••" oninput="onPinInput()" autocomplete="off"
-      inputmode="numeric" pattern="[0-9]*" aria-label="PIN entry">
+    <div id="lockout-banner" class="lockout-banner" role="alert"><i class="ti ti-lock" aria-hidden="true"></i> <span id="lockout-msg">too many attempts — locked</span></div>
+    <input class="pin-input" type="password" maxlength="6" id="pin-input" placeholder="••••" oninput="onPinInput()" autocomplete="off" inputmode="numeric" aria-label="PIN entry">
     <div class="pin-error" id="pin-error" role="alert" aria-live="assertive"></div>
-    <button class="btn btn-full" onclick="showEmailView()">cancel</button>
+    <button class="btn btn-full" onclick="showView('email-view')">cancel</button>
   </div>
 </div>
 
@@ -201,7 +183,7 @@ input[type=text],input[type=password],input[type=email],input[type=number]{paddi
   </div>
   <div id="session-bar" class="session-bar"></div>
   <div class="dash-grid" id="dash-metrics"></div>
-  <div class="tab-bar" role="tablist">
+  <div class="tab-bar">
     <button class="tab active" onclick="showDashTab('today',this)">today's slots</button>
     <button class="tab" onclick="showDashTab('roster',this)">roster</button>
     <button class="tab" onclick="showDashTab('noshows',this)">no-shows</button>
@@ -226,9 +208,6 @@ input[type=text],input[type=password],input[type=email],input[type=number]{paddi
     </div>
   </div>
 </div>
-<div style="text-align:center;margin-top:2.5rem;font-size:11.5px;color:var(--ink3);letter-spacing:0.06em;font-family:var(--font-body);">
-    built by Salma Repole
-  </div>
 </div>
 
 <script>
@@ -236,71 +215,41 @@ input[type=text],input[type=password],input[type=email],input[type=number]{paddi
 const SUPABASE_URL = 'https://dhottawheezvotadbsqq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRob3R0YXdoZWV6dm90YWRic3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2NjYzODQsImV4cCI6MjA5NTI0MjM4NH0.9dlYpaPafXNCfS395N-nux4x4ZHJRgNOD_qJTQMMfHI';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const EDGE = SUPABASE_URL + '/functions/v1';
 
-/* ── SECURITY CONFIG ─────────────────────────────────────────── */
-const HASHED_PIN         = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4';
-const MAX_PIN_ATTEMPTS   = 5;
-const LOCKOUT_MS         = 5 * 60 * 1000;
-const RATE_LIMIT_MS      = 3000;
-const SESSION_TIMEOUT_MS = 20 * 60 * 1000;
-const BOOKING_WINDOW_HRS = 2;
-const NOSHOW_RELEASE_MIN = 30;
-const MAX_LOG_ENTRIES    = 100;
-const MAX_STUDENTS       = 200;
-const MAX_NAME_LEN       = 40;
-
-async function sha256(str){
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-
-/* ── APP STATE ───────────────────────────────────────────────── */
+/* ── CONFIG ──────────────────────────────────────────────────── */
 const DAYS  = ['Tuesday','Thursday','Saturday','Sunday'];
 const SLOTS = [
   {id:'am',label:'morning',time:'9:00 am – 1:00 pm',hours:4,start:9,end:13},
   {id:'pm',label:'evening',time:'4:00 pm – 8:00 pm',hours:4,start:16,end:20}
 ];
-const WHEELS = ['Shimpo','Pacifica','BHR'];
+const WHEELS = ['Wheel A','Wheel B'];
+const RATE_LIMIT_MS      = 3000;
+const SESSION_TIMEOUT_MS = 20 * 60 * 1000;
+const NOSHOW_RELEASE_MIN = 30;
+const MAX_LOG_ENTRIES    = 100;
+const MAX_STUDENTS       = 200;
+const MAX_NAME_LEN       = 40;
 
-let students     = [];
-let reservations = {};
-let waitlists    = {};
-let noShowTimers = {};
-let countdownIntervals = {};
+/* ── STATE ───────────────────────────────────────────────────── */
+let students=[], reservations={}, waitlists={};
+let noShowTimers={}, countdownIntervals={};
+let currentStudent=null, currentDay=DAYS[0];
+let pendingAction=null;
+// instructor session token issued by edge function
+let instructorToken=null, instructorExpires=0;
+let sessionTimer=null;
+let pinAttempts=0, pinLockedUntil=0;
+let lastActionTime={}, securityLog=[];
 
-let currentStudent    = null; // { id, name, email }
-let currentDay        = DAYS[0];
-let pendingAction     = null;
-let instructorSession = null;
-let sessionTimer      = null;
-let pinAttempts       = 0;
-let pinLockedUntil    = 0;
-let lastActionTime    = {};
-let securityLog       = [];
+const bookingWindow=[];
 
 /* ── HELPERS ─────────────────────────────────────────────────── */
-function sanitize(str){
-  return String(str).replace(/[<>"'&\/\\;`]/g,'').replace(/\s+/g,' ').trim().slice(0,MAX_NAME_LEN);
-}
-function isValidName(n){ return /^[a-zA-Z\s'\-\.]{2,40}$/.test(n); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function sanitize(s){ return String(s).replace(/[<>"'&\/\\;`]/g,'').replace(/\s+/g,' ').trim().slice(0,MAX_NAME_LEN); }
 function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
-function esc(str){
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
+function isValidName(n){ return /^[a-zA-Z\s'\-\.]{2,40}$/.test(n); }
 function key(d,s,w){ return `${d}|${s}|${w}`; }
-
-function isRateLimited(action){
-  const now=Date.now();
-  if(lastActionTime[action]&&(now-lastActionTime[action])<RATE_LIMIT_MS) return true;
-  lastActionTime[action]=now; return false;
-}
-const bookingWindow=[];
-function isTooManyBookings(){
-  const now=Date.now();
-  bookingWindow.splice(0,bookingWindow.length,...bookingWindow.filter(t=>now-t<5*60*1000));
-  if(bookingWindow.length>=10) return true;
-  bookingWindow.push(now); return false;
-}
 
 function logEvent(type,detail){
   const now=new Date();
@@ -308,11 +257,21 @@ function logEvent(type,detail){
   if(securityLog.length>MAX_LOG_ENTRIES) securityLog.pop();
 }
 
-function showRateBanner(msg, secondary=false){
-  const id = secondary ? 'rate-banner-2' : 'rate-banner';
-  const msgId = secondary ? 'rate-msg-2' : 'rate-msg';
-  const b=document.getElementById(id);
-  document.getElementById(msgId).textContent=msg;
+function isRateLimited(action){
+  const now=Date.now();
+  if(lastActionTime[action]&&(now-lastActionTime[action])<RATE_LIMIT_MS) return true;
+  lastActionTime[action]=now; return false;
+}
+function isTooManyBookings(){
+  const now=Date.now();
+  bookingWindow.splice(0,bookingWindow.length,...bookingWindow.filter(t=>now-t<5*60*1000));
+  if(bookingWindow.length>=10) return true;
+  bookingWindow.push(now); return false;
+}
+
+function showRateBanner(msg,secondary=false){
+  const b=document.getElementById(secondary?'rate-banner-2':'rate-banner');
+  document.getElementById(secondary?'rate-msg-2':'rate-msg').textContent=msg;
   b.style.display='block'; clearTimeout(b._t);
   b._t=setTimeout(()=>b.style.display='none',4000);
 }
@@ -322,14 +281,26 @@ function showInfoBanner(msg){
   b.style.display='block'; clearTimeout(b._t);
   b._t=setTimeout(()=>b.style.display='none',5000);
 }
+function showToast(msg){
+  const t=document.createElement('div'); t.className='toast';
+  t.textContent=sanitize(msg).slice(0,80);
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(()=>t.remove(),3500);
+}
+function showView(id){ document.querySelectorAll('.view').forEach(v=>v.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 
-/* ── AUTO-CLEAR SUNDAY NIGHT ─────────────────────────────────── */
+/* ── SHA-256 (client side only for PIN hashing before sending) ── */
+async function sha256(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ── WEEKLY RESET (server-side preferred — this is a fallback) ── */
 async function checkWeeklyReset(){
   const now=new Date();
-  const lastReset=localStorage.getItem('kinsal_last_reset');
   const weekStart=getWeekStart(now);
+  const lastReset=localStorage.getItem('kinsal_last_reset');
   if(lastReset!==weekStart){
-    // Clear all reservations for new week
     await db.from('reservations').delete().neq('key','__none__');
     await db.from('waitlists').delete().neq('key','__none__');
     localStorage.setItem('kinsal_last_reset',weekStart);
@@ -338,19 +309,17 @@ async function checkWeeklyReset(){
 }
 function getWeekStart(date){
   const d=new Date(date);
-  const day=d.getDay(); // 0=Sun
-  const diff=d.getDate()-day;
-  d.setDate(diff); d.setHours(0,0,0,0);
+  d.setDate(d.getDate()-d.getDay());
+  d.setHours(0,0,0,0);
   return d.toISOString().split('T')[0];
 }
 
-/* ── SUPABASE DATA LAYER ─────────────────────────────────────── */
+/* ── DATA LAYER ──────────────────────────────────────────────── */
 async function loadStudents(){
   const {data,error}=await db.from('students').select('*').order('name');
   if(error){ logEvent('db-error','loadStudents: '+error.message); return; }
   students=data||[];
 }
-
 async function loadReservations(){
   const {data,error}=await db.from('reservations').select('*');
   if(error){ logEvent('db-error','loadReservations: '+error.message); return; }
@@ -358,7 +327,6 @@ async function loadReservations(){
   DAYS.forEach(d=>SLOTS.forEach(s=>WHEELS.forEach(w=>{ reservations[key(d,s.id,w)]=null; })));
   (data||[]).forEach(r=>{ reservations[r.key]=r.student_id; });
 }
-
 async function loadWaitlists(){
   const {data,error}=await db.from('waitlists').select('*').order('position');
   if(error){ logEvent('db-error','loadWaitlists: '+error.message); return; }
@@ -367,46 +335,15 @@ async function loadWaitlists(){
   (data||[]).forEach(r=>{ if(waitlists[r.key]) waitlists[r.key].push(r.student_id); });
 }
 
-async function setReservation(k, studentId){
-  if(studentId===null){
-    await db.from('reservations').delete().eq('key',k);
-  } else {
-    await db.from('reservations').upsert({key:k,student_id:studentId});
-  }
-}
-
-async function addToWaitlist(k, studentId){
-  const pos=(waitlists[k]||[]).length;
-  await db.from('waitlists').upsert({key:k,student_id:studentId,position:pos});
-}
-
-async function removeFromWaitlist(k, studentId){
-  await db.from('waitlists').delete().eq('key',k).eq('student_id',studentId);
-}
-
 async function getStudentStats(studentId){
-  const now=new Date();
-  const weekAgo=new Date(now); weekAgo.setDate(now.getDate()-7);
-  const monthAgo=new Date(now); monthAgo.setMonth(now.getMonth()-1);
-
-  // count reservations (each slot = 4 hours)
   const {data:allRes}=await db.from('reservations').select('key').eq('student_id',studentId);
-  const weeklyHours=(allRes||[]).filter(r=>{
-    const parts=r.key.split('|');
-    return DAYS.includes(parts[0]);
-  }).length * 4;
-
-  const {data:nsData}=await db.from('no_shows').select('*').eq('student_id',studentId);
+  const weeklyHours=(allRes||[]).length*4;
+  const {data:nsData}=await db.from('no_shows').select('logged_at').eq('student_id',studentId).order('logged_at',{ascending:false});
   const noShowCount=(nsData||[]).length;
-
-  const {data:lastRes}=await db.from('no_shows').select('logged_at').eq('student_id',studentId).order('logged_at',{ascending:false}).limit(1);
-  // Use reservations for last visit — check all historical no_shows
-  // Simple: count current active reservations as proxy
-  const lastVisit = nsData&&nsData.length>0
-    ? new Date(nsData[nsData.length-1].logged_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})
-    : 'no history yet';
-
-  return {weeklyHours, noShowCount, lastVisit};
+  const lastVisit=nsData&&nsData.length>0
+    ?new Date(nsData[0].logged_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})
+    :'no history yet';
+  return {weeklyHours,noShowCount,lastVisit};
 }
 
 /* ── EMAIL LOGIN ─────────────────────────────────────────────── */
@@ -414,67 +351,48 @@ async function lookupStudent(){
   const raw=document.getElementById('email-input').value.trim().toLowerCase();
   if(!isValidEmail(raw)){ showInfoBanner('please enter a valid email address'); return; }
   if(isRateLimited('lookup')){ showRateBanner('please wait before trying again'); return; }
-
-  const btn=document.getElementById('lookup-btn-text');
-  btn.innerHTML='<span class="spinner"></span>looking up…';
-  document.querySelector('.btn-primary').disabled=true;
-
+  const btn=document.getElementById('lookup-btn');
+  btn.innerHTML='<span class="spinner"></span>looking up…'; btn.disabled=true;
   const {data,error}=await db.from('students').select('*').eq('email',raw).single();
-
-  btn.textContent='continue';
-  document.querySelector('.btn-primary').disabled=false;
-
-  if(error||!data){
-    showInfoBanner('email not found, contact your instructor to be added to the roster or sign up');
-    logEvent('login-fail',`Email lookup failed: ${raw}`);
-    return;
-  }
-
+  btn.textContent='continue'; btn.disabled=false;
+  if(error||!data){ showInfoBanner('email not found — contact your instructor'); logEvent('login-fail','Email not found: '+raw); return; }
   currentStudent=data;
-  logEvent('login',`Student signed in: ${data.name}`);
+  logEvent('login','Student signed in: '+data.name);
   await enterStudentView();
 }
 
 async function enterStudentView(){
-  await loadReservations();
-  await loadWaitlists();
-
-  // populate greeting
-  document.getElementById('student-greeting').textContent=`welcome, ${currentStudent.name.split(' ')[0].toLowerCase()}`;
+  await loadReservations(); await loadWaitlists();
+  document.getElementById('student-greeting').textContent='welcome, '+currentStudent.name.split(' ')[0].toLowerCase();
   document.getElementById('student-email-display').textContent=currentStudent.email;
-  const initials=currentStudent.name.split(' ').map(n=>n[0]).join('').toUpperCase();
-  document.getElementById('student-avatar').textContent=initials;
-
-  // load stats
+  document.getElementById('student-avatar').textContent=currentStudent.name.split(' ').map(n=>n[0]).join('').toUpperCase();
   const stats=await getStudentStats(currentStudent.id);
   document.getElementById('student-hours').innerHTML=`
     <div class="hours-tile"><div class="hours-val">${stats.weeklyHours}</div><div class="hours-label">hrs this week</div></div>
     <div class="hours-tile"><div class="hours-val">${stats.noShowCount}</div><div class="hours-label">no-shows</div></div>
     <div class="hours-tile"><div class="hours-val" style="font-size:13px;padding-top:4px">${stats.lastVisit}</div><div class="hours-label">last visit</div></div>`;
-
-  showView('student-view');
-  renderDayTabs();
-  renderSlots();
+  showView('student-view'); renderDayTabs(); renderSlots();
 }
 
-function signOutStudent(){
-  currentStudent=null;
-  document.getElementById('email-input').value='';
-  showView('email-view');
-  logEvent('logout','Student signed out');
-}
+function signOutStudent(){ currentStudent=null; document.getElementById('email-input').value=''; showView('email-view'); logEvent('logout','Student signed out'); }
 
-/* ── BOOKING ─────────────────────────────────────────────────── */
-function canBook(day,slotId){
+/* ── BOOKING — calls Edge Function for server-side validation ── */
+function canBookClientSide(day,slotId){
+  // client-side pre-check for UX only — real check is server-side
   const now=new Date();
   const dayIdx=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const target=dayIdx.indexOf(day),today=now.getDay();
+  const target=dayIdx.indexOf(day), today=now.getDay();
   const sl=SLOTS.find(s=>s.id===slotId); if(!sl) return false;
   const slotStart=new Date(now);
-  slotStart.setDate(now.getDate()+(target-today+7)%7);
+  const diff=(target-today+7)%7;
+  slotStart.setDate(now.getDate()+diff);
   slotStart.setHours(sl.start,0,0,0);
+  const slotEnd=new Date(slotStart); slotEnd.setHours(sl.end,0,0,0);
+  // same day and slot hasn't ended
+  if(diff===0 && now<slotEnd) return true;
+  // within 2 hours before start
   const diffHrs=(slotStart-now)/3600000;
-  return diffHrs<=BOOKING_WINDOW_HRS&&diffHrs>0;
+  return diffHrs<=2&&diffHrs>0;
 }
 
 function studentHasBookingToday(day){
@@ -484,22 +402,23 @@ function studentHasBookingToday(day){
 async function bookSlot(day,slotId,wheel){
   if(!currentStudent){ showRateBanner('please sign in first',true); return; }
   if(isRateLimited('book')){ showRateBanner('please wait before booking again',true); return; }
-  if(isTooManyBookings()){ showRateBanner('too many booking attempts — please wait',true); logEvent('rate-limit','Booking rate limit hit'); return; }
-  if(!canBook(day,slotId)){ showRateBanner('booking window not open yet',true); return; }
+  if(isTooManyBookings()){ showRateBanner('too many attempts — please wait',true); logEvent('rate-limit','Booking rate limit hit'); return; }
+  if(!canBookClientSide(day,slotId)){ showRateBanner('booking window not open yet',true); return; }
   if(studentHasBookingToday(day)){ showRateBanner('you already have a reservation today',true); return; }
   const k=key(day,slotId,wheel);
   if(reservations[k]){ showRateBanner('that slot was just taken',true); return; }
   const sl=SLOTS.find(s=>s.id===slotId);
   pendingAction=async()=>{
-    await loadReservations(); // re-check live state
-    if(reservations[k]){ showRateBanner('slot taken while confirming',true); return; }
-    if(studentHasBookingToday(day)){ showRateBanner('you already booked today',true); return; }
-    if(!canBook(day,slotId)){ showRateBanner('window closed',true); return; }
-    await setReservation(k,currentStudent.id);
+    const res=await fetch(`${EDGE}/manage-booking`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY},
+      body:JSON.stringify({action:'book',studentId:currentStudent.id,day,slotId,wheel})
+    });
+    const data=await res.json();
+    if(!data.success){ showRateBanner(data.error||'booking failed',true); logEvent('booking-fail',data.error); return; }
     reservations[k]=currentStudent.id;
     logEvent('booking',`${currentStudent.name} reserved ${wheel} · ${day} ${sl?.label}`);
-    await loadStudentStats();
-    renderSlots();
+    await refreshStudentStats(); renderSlots();
   };
   openModal('confirm reservation',`reserve ${wheel} for the ${sl?.label} slot (${sl?.time}) on ${day}?`,'confirm');
 }
@@ -507,14 +426,18 @@ async function bookSlot(day,slotId,wheel){
 async function cancelRes(day,slotId,wheel){
   if(isRateLimited('cancel')){ showRateBanner('please wait before cancelling',true); return; }
   const k=key(day,slotId,wheel);
-  if(reservations[k]!==currentStudent?.id){ logEvent('tamper-attempt','Cancel attempted on unowned slot'); showRateBanner('that reservation is not yours',true); return; }
+  if(reservations[k]!==currentStudent?.id){ logEvent('tamper-attempt','Cancel on unowned slot'); showRateBanner('that reservation is not yours',true); return; }
   pendingAction=async()=>{
-    await loadReservations();
-    if(reservations[k]!==currentStudent?.id){ showRateBanner('reservation mismatch',true); return; }
-    await setReservation(k,null);
+    const res=await fetch(`${EDGE}/manage-booking`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY},
+      body:JSON.stringify({action:'cancel',studentId:currentStudent.id,day,slotId,wheel})
+    });
+    const data=await res.json();
+    if(!data.success){ showRateBanner(data.error||'cancel failed',true); return; }
     reservations[k]=null;
     clearInterval(countdownIntervals[k]); delete countdownIntervals[k]; delete noShowTimers[k];
-    await promoteWaitlist(k);
+    await notifyWaitlist(k);
     logEvent('cancel',`${currentStudent.name} cancelled ${wheel} · ${day} ${slotId}`);
     renderSlots();
   };
@@ -528,9 +451,20 @@ async function joinWaitlist(day,slotId,wheel){
   if((waitlists[k]||[]).includes(currentStudent.id)){ showRateBanner('already on this waitlist',true); return; }
   if(!waitlists[k]) waitlists[k]=[];
   waitlists[k].push(currentStudent.id);
-  await addToWaitlist(k,currentStudent.id);
-  logEvent('waitlist',`${currentStudent.name} joined waitlist · ${wheel} ${day} ${slotId}`);
+  await db.from('waitlists').upsert({key:k,student_id:currentStudent.id,position:waitlists[k].length-1});
+  logEvent('waitlist',`${currentStudent.name} joined waitlist · ${k}`);
   renderSlots();
+}
+
+/* ── NOTIFY WAITLIST via Edge Function ───────────────────────── */
+async function notifyWaitlist(slotKey){
+  try {
+    await fetch(`${EDGE}/notify-waitlist`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY},
+      body:JSON.stringify({slotKey})
+    });
+  } catch(e){ logEvent('notify-error','notify-waitlist failed: '+e.message); }
 }
 
 async function promoteWaitlist(k){
@@ -538,17 +472,18 @@ async function promoteWaitlist(k){
   if(!waitlists[k]||waitlists[k].length===0) return;
   const [day]=k.split('|');
   const nextId=waitlists[k].find(id=>!SLOTS.some(s=>WHEELS.some(w=>reservations[key(day,s.id,w)]===id)));
-  if(!nextId){ logEvent('waitlist','No eligible student to promote for '+k); return; }
-  await setReservation(k,nextId);
-  await removeFromWaitlist(k,nextId);
+  if(!nextId){ logEvent('waitlist','No eligible student for '+k); return; }
+  await db.from('reservations').upsert({key:k,student_id:nextId});
+  await db.from('waitlists').delete().eq('key',k).eq('student_id',nextId);
   reservations[k]=nextId;
   waitlists[k]=waitlists[k].filter(id=>id!==nextId);
   const stu=students.find(s=>s.id===nextId);
   logEvent('promote',`${stu?.name||'student'} promoted from waitlist · ${k}`);
   showToast((stu?stu.name:'next student')+' promoted from waitlist');
+  await notifyWaitlist(k);
 }
 
-async function loadStudentStats(){
+async function refreshStudentStats(){
   if(!currentStudent) return;
   const stats=await getStudentStats(currentStudent.id);
   const el=document.getElementById('student-hours');
@@ -561,84 +496,36 @@ async function loadStudentStats(){
 /* ── NO-SHOW ─────────────────────────────────────────────────── */
 function triggerNoShow(k){
   if(!requireSession()) return;
-  const stuId=reservations[k];
-  const stu=students.find(s=>s.id===stuId);
+  const stuId=reservations[k], stu=students.find(s=>s.id===stuId);
   noShowTimers[k]={end:Date.now()+NOSHOW_RELEASE_MIN*60000};
-  db.from('no_shows').insert({key:k,student_id:stuId});
+  db.from('no_shows').insert({key:k,student_id:stuId,logged_at:new Date().toISOString()});
   logEvent('no-show',`${stu?.name||'?'} marked no-show · ${k}`);
   clearInterval(countdownIntervals[k]);
   countdownIntervals[k]=setInterval(async()=>{
-    const remaining=noShowTimers[k].end-Date.now();
+    const remaining=noShowTimers[k]?.end-Date.now();
     const el=document.getElementById('cd-'+k);
     if(el) el.textContent=remaining>0?Math.ceil(remaining/60000)+'m':'releasing...';
     if(remaining<=0){
       clearInterval(countdownIntervals[k]); delete countdownIntervals[k];
-      await setReservation(k,null); reservations[k]=null; delete noShowTimers[k];
+      await db.from('reservations').delete().eq('key',k);
+      reservations[k]=null; delete noShowTimers[k];
       await promoteWaitlist(k); renderSlots(); renderDash();
     }
   },10000);
   renderSlots(); renderDash();
 }
 
-/* ── RENDER: STUDENT ─────────────────────────────────────────── */
-function renderDayTabs(){
-  document.getElementById('day-tabs').innerHTML=DAYS.map(d=>
-    `<button class="day-tab${d===currentDay?' active':''}" onclick="setDay('${d}')">${d.toLowerCase()}</button>`
-  ).join('');
+/* ── PIN AUTH — hash sent to Edge Function, never compared client-side ── */
+function showPinView(){
+  document.getElementById('lockout-banner').style.display='none';
+  document.getElementById('pin-error').textContent='';
+  document.getElementById('pin-input').value='';
+  showView('pin-view');
 }
-function setDay(d){ currentDay=d; renderDayTabs(); renderSlots(); }
-
-function renderSlots(){
-  const area=document.getElementById('slot-area');
-  let html='';
-  SLOTS.forEach(s=>{
-    const bookable=canBook(currentDay,s.id);
-    const allFull=WHEELS.every(w=>reservations[key(currentDay,s.id,w)]!==null);
-    const badge=bookable?(allFull?'<span class="slot-label badge-full">full</span>':'<span class="slot-label badge-open">open</span>'):'<span class="slot-label badge-locked">opens 2 hrs before</span>';
-    html+=`<div class="slot-card"><div class="slot-header"><span class="slot-time">${s.label} · ${s.time}</span>${badge}</div>`;
-    WHEELS.forEach(w=>{
-      const k=key(currentDay,s.id,w),booked=reservations[k],wl=waitlists[k]||[];
-      const isMe=booked===currentStudent?.id,inNS=noShowTimers[k]!==undefined;
-      if(booked){
-        const stu=students.find(st=>st.id===booked);
-        html+=`<div class="wheel-slot ${isMe?'mine':'booked'}">
-          <div><div class="student-name">${esc(stu?.name||'—')}</div><div class="muted">${esc(w)}</div></div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-            ${inNS?`<span class="countdown" id="cd-${k}">releasing soon</span>`:''}
-            ${isMe?`<button class="btn btn-sm btn-danger" onclick="cancelRes('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">cancel</button>`:''}
-          </div>
-        </div>`;
-      } else {
-        let action='';
-        if(bookable&&currentStudent){
-          if(studentHasBookingToday(currentDay)){
-            action='<span class="muted" style="font-size:11px">1/day limit</span>';
-          } else {
-            action=`<button class="btn btn-sm btn-primary" onclick="bookSlot('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">reserve</button>`;
-          }
-        }
-        html+=`<div class="wheel-slot empty"><div><div class="student-name" style="color:var(--ink3)">available</div><div class="muted">${esc(w)}</div></div>${action}</div>`;
-      }
-      if(wl.length>0){
-        const pos=wl.indexOf(currentStudent?.id);
-        html+=`<div style="font-size:11.5px;color:var(--ink3);padding:4px 0 6px 4px">
-          <i class="ti ti-list" aria-hidden="true"></i> waitlist: ${wl.length}${pos>-1?' <strong>· you are #'+(pos+1)+'</strong>':''}
-          ${currentStudent&&pos===-1&&bookable&&!studentHasBookingToday(currentDay)?`<button class="btn btn-sm" style="margin-left:8px;font-size:11px;padding:3px 8px" onclick="joinWaitlist('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">join waitlist</button>`:''}
-        </div>`;
-      }
-    });
-    html+='</div>';
-  });
-  area.innerHTML=html||'<p class="muted">no slots available</p>';
-  restartCountdownDisplays();
-}
-
-/* ── PIN AUTH ─────────────────────────────────────────────────── */
 function onPinInput(){
-  const val=document.getElementById('pin-input').value;
-  const cleaned=val.replace(/\D/g,'');
-  if(cleaned!==val) document.getElementById('pin-input').value=cleaned;
-  if(cleaned.length>=4) checkPin(cleaned);
+  const val=document.getElementById('pin-input').value.replace(/\D/g,'');
+  document.getElementById('pin-input').value=val;
+  if(val.length>=4) checkPin(val);
 }
 async function checkPin(val){
   const now=Date.now();
@@ -649,61 +536,120 @@ async function checkPin(val){
     document.getElementById('pin-input').value=''; return;
   }
   if(val.length<4) return;
-  const hashed=await sha256(val);
   document.getElementById('pin-input').value='';
-  if(hashed===HASHED_PIN){
-    pinAttempts=0; logEvent('auth-success','Instructor authenticated');
-    startInstructorSession();
+  // hash client-side then send — server does the actual comparison
+  const hashed=await sha256(val);
+  let result;
+  try {
+    const res=await fetch(`${EDGE}/verify-pin`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY},
+      body:JSON.stringify({pinHash:hashed})
+    });
+    result=await res.json();
+  } catch(e){
+    document.getElementById('pin-error').textContent='connection error — try again';
+    return;
+  }
+  if(result.success){
+    pinAttempts=0;
+    instructorToken=result.token;
+    instructorExpires=result.expires;
+    logEvent('auth-success','Instructor authenticated via edge function');
+    await startInstructorSession();
   } else {
-    pinAttempts++; logEvent('auth-fail',`Wrong PIN attempt ${pinAttempts}/${MAX_PIN_ATTEMPTS}`);
-    if(pinAttempts>=MAX_PIN_ATTEMPTS){
-      pinLockedUntil=now+LOCKOUT_MS; pinAttempts=0;
+    pinAttempts++;
+    logEvent('auth-fail',`Wrong PIN attempt ${pinAttempts}`);
+    if(pinAttempts>=5){
+      pinLockedUntil=now+(5*60*1000); pinAttempts=0;
       document.getElementById('lockout-msg').textContent='too many attempts — locked for 5 minutes';
       document.getElementById('lockout-banner').style.display='block';
       document.getElementById('pin-error').textContent='';
-      logEvent('lockout','PIN locked out for 5 minutes');
+      logEvent('lockout','PIN locked out');
     } else {
-      const left=MAX_PIN_ATTEMPTS-pinAttempts;
-      document.getElementById('pin-error').textContent=`incorrect — ${left} attempt${left>1?'s':''} remaining`;
+      document.getElementById('pin-error').textContent=`incorrect — ${5-pinAttempts} attempt${5-pinAttempts>1?'s':''} remaining`;
     }
   }
 }
 
 /* ── SESSION ─────────────────────────────────────────────────── */
 async function startInstructorSession(){
-  instructorSession={startedAt:Date.now(),expiresAt:Date.now()+SESSION_TIMEOUT_MS};
-  clearInterval(sessionTimer); sessionTimer=setInterval(tickSession,30000);
+  clearInterval(sessionTimer);
+  sessionTimer=setInterval(tickSession,30000);
   await loadStudents(); await loadReservations(); await loadWaitlists();
   showView('instructor-view'); renderDash(); updateSessionBar();
 }
 function tickSession(){
-  if(!instructorSession) return;
-  if(Date.now()>=instructorSession.expiresAt){ logEvent('session','Session expired'); instructorLogout(); showToast('session expired'); }
+  if(Date.now()>=instructorExpires){ logEvent('session','Session expired'); instructorLogout(); showToast('session expired'); }
   else updateSessionBar();
 }
 function updateSessionBar(){
-  if(!instructorSession) return;
-  const r=Math.max(0,Math.ceil((instructorSession.expiresAt-Date.now())/60000));
+  const r=Math.max(0,Math.ceil((instructorExpires-Date.now())/60000));
   document.getElementById('session-bar').textContent=`session expires in ${r} min`;
 }
-function instructorLogout(){ clearInterval(sessionTimer); sessionTimer=null; instructorSession=null; logEvent('auth-logout','Instructor signed out'); showView('email-view'); }
+function instructorLogout(){ clearInterval(sessionTimer); sessionTimer=null; instructorToken=null; instructorExpires=0; logEvent('auth-logout','Instructor signed out'); showView('email-view'); }
 function requireSession(){
-  if(!instructorSession||Date.now()>=instructorSession.expiresAt){ instructorLogout(); return false; }
+  if(!instructorToken||Date.now()>=instructorExpires){ instructorLogout(); return false; }
   return true;
 }
 
-/* ── NAVIGATION ──────────────────────────────────────────────── */
-function showView(id){ document.querySelectorAll('.view').forEach(v=>v.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-function showPinView(){ document.getElementById('lockout-banner').style.display='none'; document.getElementById('pin-error').textContent=''; document.getElementById('pin-input').value=''; showView('pin-view'); }
-function showEmailView(){ showView('email-view'); }
+/* ── STUDENT RENDER ──────────────────────────────────────────── */
+function renderDayTabs(){
+  document.getElementById('day-tabs').innerHTML=DAYS.map(d=>
+    `<button class="day-tab${d===currentDay?' active':''}" onclick="setDay('${d}')" role="tab" aria-selected="${d===currentDay}">${d.toLowerCase()}</button>`
+  ).join('');
+}
+function setDay(d){ currentDay=d; renderDayTabs(); renderSlots(); }
+
+function renderSlots(){
+  const area=document.getElementById('slot-area');
+  let html='';
+  SLOTS.forEach(s=>{
+    const bookable=canBookClientSide(currentDay,s.id);
+    const allFull=WHEELS.every(w=>reservations[key(currentDay,s.id,w)]!==null);
+    const badge=bookable?(allFull?'<span class="slot-label badge-full">full</span>':'<span class="slot-label badge-open">open</span>'):'<span class="slot-label badge-locked">opens 2 hrs before</span>';
+    html+=`<div class="slot-card"><div class="slot-header"><span class="slot-time">${s.label} · ${s.time}</span>${badge}</div>`;
+    WHEELS.forEach(w=>{
+      const k=key(currentDay,s.id,w),booked=reservations[k],wl=waitlists[k]||[];
+      const isMe=booked===currentStudent?.id,inNS=noShowTimers[k]!==undefined;
+      if(booked){
+        const stu=students.find(st=>st.id===booked);
+        html+=`<div class="wheel-slot ${isMe?'mine':'booked'}">
+          <div><div class="student-name">${esc(stu?.name||'—')}</div><div class="muted">${esc(w)}</div></div>
+          <div style="display:flex;gap:4px;align-items:center">
+            ${inNS?`<span class="countdown" id="cd-${k}">releasing soon</span>`:''}
+            ${isMe?`<button class="btn btn-sm btn-danger" onclick="cancelRes('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">cancel</button>`:''}
+          </div>
+        </div>`;
+      } else {
+        let action='';
+        if(bookable&&currentStudent){
+          action=studentHasBookingToday(currentDay)
+            ?'<span class="muted" style="font-size:11px">1/day limit</span>'
+            :`<button class="btn btn-sm btn-primary" onclick="bookSlot('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">reserve</button>`;
+        }
+        html+=`<div class="wheel-slot empty"><div><div class="student-name" style="color:var(--ink3)">available</div><div class="muted">${esc(w)}</div></div>${action}</div>`;
+      }
+      if(wl.length>0){
+        const pos=wl.indexOf(currentStudent?.id);
+        html+=`<div style="font-size:11.5px;color:var(--ink3);padding:4px 0 6px 4px">
+          <i class="ti ti-list" aria-hidden="true"></i> waitlist: ${wl.length}${pos>-1?` <strong>· you are #${pos+1}</strong>`:''}
+          ${currentStudent&&pos===-1&&bookable&&!studentHasBookingToday(currentDay)?`<button class="btn btn-sm" style="margin-left:8px;font-size:11px;padding:3px 8px" onclick="joinWaitlist('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">join waitlist</button>`:''}
+        </div>`;
+      }
+    });
+    html+='</div>';
+  });
+  area.innerHTML=html||'<p class="muted">no slots available</p>';
+  restartCountdownDisplays();
+}
 
 /* ── INSTRUCTOR RENDER ───────────────────────────────────────── */
 async function renderDash(){
   if(!requireSession()) return;
   let total=0,booked=0,wlCount=0;
   DAYS.forEach(d=>SLOTS.forEach(s=>WHEELS.forEach(w=>{
-    total++;
-    if(reservations[key(d,s.id,w)]!==null) booked++;
+    total++; if(reservations[key(d,s.id,w)]!==null) booked++;
     wlCount+=(waitlists[key(d,s.id,w)]||[]).length;
   })));
   document.getElementById('dash-metrics').innerHTML=`
@@ -727,7 +673,7 @@ async function renderDash(){
           <div style="display:flex;align-items:center;gap:8px">
             <div class="avatar">${esc(stu.name.split(' ').map(n=>n[0]).join(''))}</div>
             <div><div class="student-name">${esc(stu.name)}</div><div class="muted">${esc(stu.email||'')}</div></div>
-            ${isNS?`<span class="countdown" id="cd-${k}">timer</span>`:''}
+            ${isNS?`<span class="countdown" id="cd-${k}">releasing...</span>`:''}
           </div>
           <div style="display:flex;gap:6px">
             ${!isNS?`<button class="btn btn-sm" onclick="triggerNoShow('${k}')">mark no-show</button>`:''}
@@ -741,17 +687,14 @@ async function renderDash(){
   document.getElementById('dash-today').innerHTML=todayHtml;
   restartCountdownDisplays();
 
-  // roster with stats
   let rosterHtml='<div class="card">';
   for(const s of students){
     const stats=await getStudentStats(s.id);
     rosterHtml+=`<div class="roster-row">
       <div style="display:flex;align-items:center;gap:10px">
         <div class="avatar">${esc(s.name.split(' ').map(n=>n[0]).join(''))}</div>
-        <div>
-          <div class="student-name">${esc(s.name)}</div>
-          <div class="muted">${esc(s.email||'')} · ${stats.weeklyHours}h this week · ${stats.noShowCount} no-shows</div>
-        </div>
+        <div><div class="student-name">${esc(s.name)}</div>
+        <div class="muted">${esc(s.email||'')} · ${stats.weeklyHours}h this week · ${stats.noShowCount} no-shows · last: ${stats.lastVisit}</div></div>
       </div>
       <button class="btn btn-sm btn-danger" onclick="removeStudent('${esc(s.id)}')">remove</button>
     </div>`;
@@ -763,33 +706,33 @@ async function renderDash(){
   </div></div>`;
   document.getElementById('dash-roster').innerHTML=rosterHtml;
 
-  // no-shows from db
   const {data:nsData}=await db.from('no_shows').select('*,students(name)').order('logged_at',{ascending:false}).limit(30);
-  const nsHtml=!nsData||nsData.length===0
+  document.getElementById('dash-noshows').innerHTML=!nsData||nsData.length===0
     ?'<p class="muted">no no-shows recorded.</p>'
-    :(nsData||[]).map(ns=>{
+    :nsData.map(ns=>{
         const parts=ns.key.split('|');
         return `<div class="no-show-row"><i class="ti ti-alert-triangle" aria-hidden="true" style="color:var(--amber)"></i><span><strong>${esc(ns.students?.name||'unknown')}</strong> · ${esc(parts[0])} ${esc(parts[1])} · ${new Date(ns.logged_at).toLocaleString()}</span></div>`;
       }).join('');
-  document.getElementById('dash-noshows').innerHTML=nsHtml;
 
   document.getElementById('dash-settings').innerHTML=`<div class="card">
     <div class="section-label">booking window</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">students can book up to 2 hours before each slot.</p>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">students can book up to 2 hours before each slot, or any time during the slot.</p>
     <div class="section-label">no-show window</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">slot releases after 30 minutes. next eligible student on waitlist is promoted.</p>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">slot releases after 30 minutes. next eligible student on waitlist is promoted and emailed.</p>
     <div class="section-label">weekly auto-reset</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">all reservations clear automatically each sunday night when a student first loads the app.</p>
-    <div class="section-label">change pin</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">pin is stored as a sha-256 hash — never in plaintext.</p>
-    <div style="display:flex;gap:8px;margin-top:6px">
-      <input type="password" id="new-pin" placeholder="new pin (4–6 digits)" maxlength="6" inputmode="numeric" style="width:180px" autocomplete="new-password">
-      <button class="btn btn-sm btn-primary" onclick="changePIN()">save</button>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">all reservations clear automatically each sunday night.</p>
+    <div class="section-label">pin management</div>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">pin is verified server-side via edge function — never compared in the browser.</p>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">to change your pin: go to supabase → edge functions → manage secrets → update PIN_HASH with the new sha-256 hash.</p>
+    <div style="margin-top:8px;background:var(--bg2);border-radius:8px;padding:.75rem 1rem;">
+      <p style="font-size:12px;color:var(--ink3);margin-bottom:6px">generate a new hash:</p>
+      <div style="display:flex;gap:8px">
+        <input type="password" id="new-pin" placeholder="new pin (4–6 digits)" maxlength="6" inputmode="numeric" style="width:180px" autocomplete="new-password">
+        <button class="btn btn-sm btn-primary" onclick="generatePinHash()">get hash</button>
+      </div>
+      <div id="pin-hash-out" style="font-size:11px;color:var(--ink3);margin-top:8px;font-family:monospace;word-break:break-all;display:none"></div>
     </div>
-    <div id="pin-saved" style="font-size:12px;color:var(--green);margin-top:6px;display:none"><i class="ti ti-check" aria-hidden="true"></i> pin hash updated</div>
-    <div id="pin-hash-out" style="font-size:11px;color:var(--ink3);margin-top:4px;font-family:monospace;word-break:break-all;display:none"></div>
     <div class="section-label" style="margin-top:16px">manual weekly reset</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">clear all reservations and waitlists now.</p>
     <button class="btn btn-sm btn-danger" onclick="manualReset()">clear all reservations</button>
   </div>`;
 }
@@ -807,43 +750,28 @@ function renderSecurityLog(){
     </div>`;
 }
 
-function clearLog(){ if(!requireSession()) return; securityLog=[]; renderSecurityLog(); logEvent('log-cleared','Instructor cleared log'); }
+function clearLog(){ if(!requireSession()) return; securityLog=[]; renderSecurityLog(); }
 function exportLog(){
   if(!requireSession()) return;
   const csv=['time,isoTime,type,detail',...securityLog.map(e=>`"${e.time}","${e.isoTime}","${e.type}","${e.detail}"`)].join('\n');
-  const blob=new Blob([csv],{type:'text/csv'}), url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download='kinsal-log.csv'; a.click();
-  URL.revokeObjectURL(url); logEvent('log-export','Instructor exported log');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='kinsal-log.csv'; a.click();
 }
 
-async function changePIN(){
-  if(!requireSession()) return;
-  const inp=document.getElementById('new-pin'), val=inp.value.trim();
+async function generatePinHash(){
+  const val=document.getElementById('new-pin').value.trim();
   if(!/^\d{4,6}$/.test(val)){ showToast('pin must be 4–6 digits'); return; }
-  const hash=await sha256(val); inp.value='';
-  document.getElementById('pin-saved').style.display='block';
-  document.getElementById('pin-hash-out').style.display='block';
-  document.getElementById('pin-hash-out').textContent='new hash: '+hash;
-  logEvent('pin-change','Instructor generated new PIN hash');
-}
-
-async function manualReset(){
-  if(!requireSession()) return;
-  pendingAction=async()=>{
-    await db.from('reservations').delete().neq('key','__none__');
-    await db.from('waitlists').delete().neq('key','__none__');
-    await loadReservations(); await loadWaitlists();
-    logEvent('manual-reset','Instructor manually cleared all reservations');
-    showToast('all reservations cleared'); renderDash();
-  };
-  openModal('clear all reservations','this will remove every reservation and waitlist entry. cannot be undone.','yes, clear all');
+  const hash=await sha256(val);
+  document.getElementById('new-pin').value='';
+  const out=document.getElementById('pin-hash-out');
+  out.style.display='block';
+  out.innerHTML=`copy this hash into supabase → edge functions → manage secrets → PIN_HASH:<br><strong>${hash}</strong>`;
 }
 
 async function adminCancel(k){
   if(!requireSession()) return;
-  await setReservation(k,null); reservations[k]=null;
-  clearInterval(countdownIntervals[k]); delete countdownIntervals[k]; delete noShowTimers[k];
-  await promoteWaitlist(k); logEvent('admin-cancel','Instructor cancelled slot '+k);
+  await db.from('reservations').delete().eq('key',k);
+  reservations[k]=null; clearInterval(countdownIntervals[k]); delete countdownIntervals[k]; delete noShowTimers[k];
+  await promoteWaitlist(k); logEvent('admin-cancel','Instructor cancelled '+k);
   renderDash(); renderSlots();
 }
 
@@ -852,28 +780,38 @@ async function removeStudent(id){
   const stu=students.find(s=>s.id===id);
   await db.from('students').delete().eq('id',id);
   students=students.filter(s=>s.id!==id);
-  Object.keys(reservations).forEach(k=>{ if(reservations[k]===id) reservations[k]=null; });
-  logEvent('roster',`Removed student: ${stu?.name}`);
+  logEvent('roster','Removed student: '+stu?.name);
   renderDash();
 }
 
 async function addStudent(){
   if(!requireSession()) return;
-  const nameInp=document.getElementById('new-student-name');
-  const emailInp=document.getElementById('new-student-email');
-  const name=sanitize(nameInp.value);
-  const email=emailInp.value.trim().toLowerCase();
+  const name=sanitize(document.getElementById('new-student-name').value);
+  const email=document.getElementById('new-student-email').value.trim().toLowerCase();
   if(!isValidName(name)){ showToast('enter a valid name'); return; }
   if(!isValidEmail(email)){ showToast('enter a valid email'); return; }
   if(students.length>=MAX_STUDENTS){ showToast('roster limit reached'); return; }
   if(students.some(s=>s.email===email)){ showToast('email already registered'); return; }
   const id='s'+Date.now();
   const {error}=await db.from('students').insert({id,name,email});
-  if(error){ showToast('error adding student — try again'); logEvent('db-error',error.message); return; }
+  if(error){ showToast('error adding student'); logEvent('db-error',error.message); return; }
   students.push({id,name,email});
-  nameInp.value=''; emailInp.value='';
+  document.getElementById('new-student-name').value='';
+  document.getElementById('new-student-email').value='';
   logEvent('roster','Added student: '+name);
   renderDash();
+}
+
+async function manualReset(){
+  if(!requireSession()) return;
+  pendingAction=async()=>{
+    await db.from('reservations').delete().neq('key','__none__');
+    await db.from('waitlists').delete().neq('key','__none__');
+    await loadReservations(); await loadWaitlists();
+    logEvent('manual-reset','Instructor cleared all reservations');
+    showToast('all reservations cleared'); renderDash();
+  };
+  openModal('clear all reservations','this will remove every reservation and waitlist entry. cannot be undone.','yes, clear all');
 }
 
 function showDashTab(tab,btn){
@@ -899,17 +837,10 @@ document.getElementById('modal-confirm').onclick=()=>{ if(pendingAction) pending
 document.getElementById('modal-overlay').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeModal(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 
-function showToast(msg){
-  const t=document.createElement('div'); t.className='toast';
-  t.textContent=sanitize(msg).slice(0,80);
-  document.getElementById('toast-container').appendChild(t);
-  setTimeout(()=>t.remove(),3500);
-}
-
 function restartCountdownDisplays(){
   Object.keys(noShowTimers).forEach(k=>{
-    const el=document.getElementById('cd-'+k), remaining=noShowTimers[k].end-Date.now();
-    if(el) el.textContent=remaining>0?Math.ceil(remaining/60000)+'m':'releasing...';
+    const el=document.getElementById('cd-'+k);
+    if(el){ const r=noShowTimers[k].end-Date.now(); el.textContent=r>0?Math.ceil(r/60000)+'m':'releasing...'; }
   });
 }
 
@@ -921,5 +852,8 @@ async function init(){
 }
 init();
 </script>
+  <div style="text-align:center;padding:2rem 0 .5rem;font-size:11px;color:var(--ink3);letter-spacing:0.08em;font-family:var(--font-body)">
+  created by Salma Repole
+</div>
 </body>
 </html>
