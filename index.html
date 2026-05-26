@@ -802,6 +802,26 @@ function restartCountdownDisplays(){
     if(el){ const r=noShowTimers[k].end-Date.now(); el.textContent=r>0?Math.ceil(r/60000)+'m':'releasing...'; }
   });
 }
+  // realtime — auto-refresh when server releases a no-show slot
+db.channel('reservations-changes')
+  .on('postgres_changes', {
+    event: 'DELETE',
+    schema: 'public',
+    table: 'reservations'
+  }, async (payload) => {
+    const k = payload.old.key;
+    logEvent('server-release', 'Slot released by server: ' + k);
+    reservations[k] = null;
+    delete noShowTimers[k];
+    clearInterval(countdownIntervals[k]);
+    delete countdownIntervals[k];
+    await notifyWaitlist(k);
+    await promoteWaitlist(k);
+    renderSlots();
+    if(instructorToken && Date.now() < instructorExpires) renderDash();
+  })
+  .subscribe();
+  
 async function init(){
   await checkWeeklyReset();
   await loadStudents();
