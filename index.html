@@ -598,13 +598,15 @@ function renderSlots(){
         }
         html+=`<div class="wheel-slot empty"><div><div class="student-name" style="color:var(--ink3)">available</div><div class="muted">${esc(w)}</div></div>${action}</div>`;
       }
-      if(wl.length>0){
-        const pos=wl.indexOf(currentStudent?.id);
+      const pos=wl.indexOf(currentStudent?.id);
+      const slotFull=reservations[k]!==null;
+      const canJoin=currentStudent&&bookable&&!studentHasBookingToday(currentDay)&&pos===-1&&slotFull;
+      if(wl.length>0||canJoin){
         html+=`<div style="font-size:11.5px;color:var(--ink3);padding:4px 0 6px 4px">
-          <i class="ti ti-list" aria-hidden="true"></i> waitlist: ${wl.length}${pos>-1?` <strong>· you are #${pos+1}</strong>`:''}
-          ${currentStudent&&pos===-1&&bookable&&!studentHasBookingToday(currentDay)?`<button class="btn btn-sm" style="margin-left:8px;font-size:11px;padding:3px 8px" onclick="joinWaitlist('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">join waitlist</button>`:''}
-        </div>`;
-      }
+          <i class="ti ti-list" aria-hidden="true"></i> ${wl.length>0?`waitlist: ${wl.length}`:'slot full'}${pos>-1?` <strong>· you are #${pos+1}</strong>`:''}
+          ${canJoin?`<button class="btn btn-sm" style="margin-left:8px;font-size:11px;padding:3px 8px" onclick="joinWaitlist('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">join waitlist</button>`:''}
+      </div>`;
+}
     });
     html+='</div>';
   });
