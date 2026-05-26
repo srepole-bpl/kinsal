@@ -378,6 +378,22 @@ function signOutStudent(){ currentStudent=null; document.getElementById('email-i
 
 /* ── BOOKING — calls Edge Function for server-side validation ── */
 function canBookClientSide(day,slotId){
+  const now=new Date();
+  const dayIdx=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const target=dayIdx.indexOf(day), today=now.getDay();
+  const sl=SLOTS.find(s=>s.id===slotId); if(!sl) return false;
+  const slotStart=new Date(now);
+  const diff=(target-today+7)%7;
+  slotStart.setDate(now.getDate()+diff);
+  slotStart.setHours(sl.start,0,0,0);
+  const cutoff=new Date(slotStart);
+  cutoff.setHours(sl.end-1,0,0,0); // 1 hour before end
+  const diffHrs=(slotStart-now)/3600000;
+  // same day: open if we haven't hit the cutoff yet
+  if(diff===0 && now<cutoff) return true;
+  // future day: open within 2 hours before start
+  return diffHrs<=2&&diffHrs>0;
+}
   // client-side pre-check for UX only — real check is server-side
   const now=new Date();
   const dayIdx=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
