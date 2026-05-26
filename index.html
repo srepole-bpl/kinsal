@@ -211,13 +211,11 @@ input[type=text],input[type=password],input[type=email]{padding:9px 12px;border-
 </div>
 
 <script>
-/* ── SUPABASE ─────────────────────────────────────────────────── */
 const SUPABASE_URL = 'https://dhottawheezvotadbsqq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRob3R0YXdoZWV6dm90YWRic3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2NjYzODQsImV4cCI6MjA5NTI0MjM4NH0.9dlYpaPafXNCfS395N-nux4x4ZHJRgNOD_qJTQMMfHI';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const EDGE = SUPABASE_URL + '/functions/v1';
 
-/* ── CONFIG ──────────────────────────────────────────────────── */
 const DAYS  = ['Tuesday','Thursday','Saturday','Sunday'];
 const SLOTS = [
   {id:'am',label:'morning',time:'9:00 am – 1:00 pm',hours:4,start:9,end:13},
@@ -225,26 +223,18 @@ const SLOTS = [
 ];
 const WHEELS = ['Shimpo','Pacifica','BHR'];
 const RATE_LIMIT_MS      = 3000;
-const SESSION_TIMEOUT_MS = 20 * 60 * 1000;
 const NOSHOW_RELEASE_MIN = 30;
 const MAX_LOG_ENTRIES    = 100;
 const MAX_STUDENTS       = 200;
 const MAX_NAME_LEN       = 40;
 
-/* ── STATE ───────────────────────────────────────────────────── */
 let students=[], reservations={}, waitlists={};
 let noShowTimers={}, countdownIntervals={};
-let currentStudent=null, currentDay=DAYS[0];
-let pendingAction=null;
-// instructor session token issued by edge function
-let instructorToken=null, instructorExpires=0;
-let sessionTimer=null;
-let pinAttempts=0, pinLockedUntil=0;
-let lastActionTime={}, securityLog=[];
-
+let currentStudent=null, currentDay=DAYS[0], pendingAction=null;
+let instructorToken=null, instructorExpires=0, sessionTimer=null;
+let pinAttempts=0, pinLockedUntil=0, lastActionTime={}, securityLog=[];
 const bookingWindow=[];
 
-/* ── HELPERS ─────────────────────────────────────────────────── */
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function sanitize(s){ return String(s).replace(/[<>"'&\/\\;`]/g,'').replace(/\s+/g,' ').trim().slice(0,MAX_NAME_LEN); }
 function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
@@ -256,7 +246,6 @@ function logEvent(type,detail){
   securityLog.unshift({time:now.toLocaleTimeString(),isoTime:now.toISOString(),type,detail:String(detail).replace(/[<>"'&]/g,'').slice(0,200)});
   if(securityLog.length>MAX_LOG_ENTRIES) securityLog.pop();
 }
-
 function isRateLimited(action){
   const now=Date.now();
   if(lastActionTime[action]&&(now-lastActionTime[action])<RATE_LIMIT_MS) return true;
@@ -268,7 +257,6 @@ function isTooManyBookings(){
   if(bookingWindow.length>=10) return true;
   bookingWindow.push(now); return false;
 }
-
 function showRateBanner(msg,secondary=false){
   const b=document.getElementById(secondary?'rate-banner-2':'rate-banner');
   document.getElementById(secondary?'rate-msg-2':'rate-msg').textContent=msg;
@@ -289,16 +277,13 @@ function showToast(msg){
 }
 function showView(id){ document.querySelectorAll('.view').forEach(v=>v.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 
-/* ── SHA-256 (client side only for PIN hashing before sending) ── */
 async function sha256(str){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-/* ── WEEKLY RESET (server-side preferred — this is a fallback) ── */
 async function checkWeeklyReset(){
-  const now=new Date();
-  const weekStart=getWeekStart(now);
+  const weekStart=getWeekStart(new Date());
   const lastReset=localStorage.getItem('kinsal_last_reset');
   if(lastReset!==weekStart){
     await db.from('reservations').delete().neq('key','__none__');
@@ -309,12 +294,10 @@ async function checkWeeklyReset(){
 }
 function getWeekStart(date){
   const d=new Date(date);
-  d.setDate(d.getDate()-d.getDay());
-  d.setHours(0,0,0,0);
+  d.setDate(d.getDate()-d.getDay()); d.setHours(0,0,0,0);
   return d.toISOString().split('T')[0];
 }
 
-/* ── DATA LAYER ──────────────────────────────────────────────── */
 async function loadStudents(){
   const {data,error}=await db.from('students').select('*').order('name');
   if(error){ logEvent('db-error','loadStudents: '+error.message); return; }
@@ -334,19 +317,15 @@ async function loadWaitlists(){
   DAYS.forEach(d=>SLOTS.forEach(s=>WHEELS.forEach(w=>{ waitlists[key(d,s.id,w)]=[]; })));
   (data||[]).forEach(r=>{ if(waitlists[r.key]) waitlists[r.key].push(r.student_id); });
 }
-
 async function getStudentStats(studentId){
   const {data:allRes}=await db.from('reservations').select('key').eq('student_id',studentId);
   const weeklyHours=(allRes||[]).length*4;
   const {data:nsData}=await db.from('no_shows').select('logged_at').eq('student_id',studentId).order('logged_at',{ascending:false});
   const noShowCount=(nsData||[]).length;
-  const lastVisit=nsData&&nsData.length>0
-    ?new Date(nsData[0].logged_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})
-    :'no history yet';
+  const lastVisit=nsData&&nsData.length>0?new Date(nsData[0].logged_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'no history yet';
   return {weeklyHours,noShowCount,lastVisit};
 }
 
-/* ── EMAIL LOGIN ─────────────────────────────────────────────── */
 async function lookupStudent(){
   const raw=document.getElementById('email-input').value.trim().toLowerCase();
   if(!isValidEmail(raw)){ showInfoBanner('please enter a valid email address'); return; }
@@ -360,7 +339,6 @@ async function lookupStudent(){
   logEvent('login','Student signed in: '+data.name);
   await enterStudentView();
 }
-
 async function enterStudentView(){
   await loadReservations(); await loadWaitlists();
   document.getElementById('student-greeting').textContent='welcome, '+currentStudent.name.split(' ')[0].toLowerCase();
@@ -373,40 +351,22 @@ async function enterStudentView(){
     <div class="hours-tile"><div class="hours-val" style="font-size:13px;padding-top:4px">${stats.lastVisit}</div><div class="hours-label">last visit</div></div>`;
   showView('student-view'); renderDayTabs(); renderSlots();
 }
-
 function signOutStudent(){ currentStudent=null; document.getElementById('email-input').value=''; showView('email-view'); logEvent('logout','Student signed out'); }
 
-/* ── BOOKING — calls Edge Function for server-side validation ── */
+/* ── BOOKING WINDOW — open 2hrs before start, closes 1hr before end ── */
 function canBookClientSide(day,slotId){
   const now=new Date();
   const dayIdx=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const target=dayIdx.indexOf(day), today=now.getDay();
-  const sl=SLOTS.find(s=>s.id===slotId); if(!sl) return false;
-  const slotStart=new Date(now);
+  const sl=SLOTS.find(s=>s.id===slotId);
+  if(!sl) return false;
   const diff=(target-today+7)%7;
+  const slotStart=new Date(now);
   slotStart.setDate(now.getDate()+diff);
   slotStart.setHours(sl.start,0,0,0);
   const cutoff=new Date(slotStart);
   cutoff.setHours(sl.end-1,0,0,0);
   if(diff===0&&now<cutoff) return true;
-  // same day: open if we haven't hit the cutoff yet
-  if(diff===0 && now<cutoff) return true;
-  // future day: open within 2 hours before start
-  return diffHrs<=2&&diffHrs>0;
-}
-  // client-side pre-check for UX only — real check is server-side
-  const now=new Date();
-  const dayIdx=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const target=dayIdx.indexOf(day), today=now.getDay();
-  const sl=SLOTS.find(s=>s.id===slotId); if(!sl) return false;
-  const slotStart=new Date(now);
-  const diff=(target-today+7)%7;
-  slotStart.setDate(now.getDate()+diff);
-  slotStart.setHours(sl.start,0,0,0);
-  const slotEnd=new Date(slotStart); slotEnd.setHours(sl.end,0,0,0);
-  // same day and slot hasn't ended
-  if(diff===0 && now<slotEnd) return true;
-  // within 2 hours before start
   const diffHrs=(slotStart-now)/3600000;
   return diffHrs<=2&&diffHrs>0;
 }
@@ -472,7 +432,6 @@ async function joinWaitlist(day,slotId,wheel){
   renderSlots();
 }
 
-/* ── NOTIFY WAITLIST via Edge Function ───────────────────────── */
 async function notifyWaitlist(slotKey){
   try {
     await fetch(`${EDGE}/notify-waitlist`,{
@@ -509,7 +468,6 @@ async function refreshStudentStats(){
     <div class="hours-tile"><div class="hours-val" style="font-size:13px;padding-top:4px">${stats.lastVisit}</div><div class="hours-label">last visit</div></div>`;
 }
 
-/* ── NO-SHOW ─────────────────────────────────────────────────── */
 function triggerNoShow(k){
   if(!requireSession()) return;
   const stuId=reservations[k], stu=students.find(s=>s.id===stuId);
@@ -531,7 +489,6 @@ function triggerNoShow(k){
   renderSlots(); renderDash();
 }
 
-/* ── PIN AUTH — hash sent to Edge Function, never compared client-side ── */
 function showPinView(){
   document.getElementById('lockout-banner').style.display='none';
   document.getElementById('pin-error').textContent='';
@@ -553,7 +510,6 @@ async function checkPin(val){
   }
   if(val.length<4) return;
   document.getElementById('pin-input').value='';
-  // hash client-side then send — server does the actual comparison
   const hashed=await sha256(val);
   let result;
   try {
@@ -568,10 +524,8 @@ async function checkPin(val){
     return;
   }
   if(result.success){
-    pinAttempts=0;
-    instructorToken=result.token;
-    instructorExpires=result.expires;
-    logEvent('auth-success','Instructor authenticated via edge function');
+    pinAttempts=0; instructorToken=result.token; instructorExpires=result.expires;
+    logEvent('auth-success','Instructor authenticated');
     await startInstructorSession();
   } else {
     pinAttempts++;
@@ -588,7 +542,6 @@ async function checkPin(val){
   }
 }
 
-/* ── SESSION ─────────────────────────────────────────────────── */
 async function startInstructorSession(){
   clearInterval(sessionTimer);
   sessionTimer=setInterval(tickSession,30000);
@@ -609,7 +562,6 @@ function requireSession(){
   return true;
 }
 
-/* ── STUDENT RENDER ──────────────────────────────────────────── */
 function renderDayTabs(){
   document.getElementById('day-tabs').innerHTML=DAYS.map(d=>
     `<button class="day-tab${d===currentDay?' active':''}" onclick="setDay('${d}')" role="tab" aria-selected="${d===currentDay}">${d.toLowerCase()}</button>`
@@ -660,7 +612,6 @@ function renderSlots(){
   restartCountdownDisplays();
 }
 
-/* ── INSTRUCTOR RENDER ───────────────────────────────────────── */
 async function renderDash(){
   if(!requireSession()) return;
   let total=0,booked=0,wlCount=0;
@@ -727,19 +678,19 @@ async function renderDash(){
     ?'<p class="muted">no no-shows recorded.</p>'
     :nsData.map(ns=>{
         const parts=ns.key.split('|');
-        return `<div class="no-show-row"><i class="ti ti-alert-triangle" aria-hidden="true" style="color:var(--amber)"></i><span><strong>${esc(ns.students?.name||'unknown')}</strong> · ${esc(parts[0])} ${esc(parts[1])} · ${new Date(ns.logged_at).toLocaleString()}</span></div>`;
+        return `<div class="no-show-row"><i class="ti ti-alert-triangle" style="color:var(--amber)" aria-hidden="true"></i><span><strong>${esc(ns.students?.name||'unknown')}</strong> · ${esc(parts[0])} ${esc(parts[1])} · ${new Date(ns.logged_at).toLocaleString()}</span></div>`;
       }).join('');
 
   document.getElementById('dash-settings').innerHTML=`<div class="card">
     <div class="section-label">booking window</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">students can book up to 2 hours before each slot, or any time during the slot.</p>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">opens 2 hours before each slot starts. closes 1 hour before the slot ends.</p>
     <div class="section-label">no-show window</div>
     <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">slot releases after 30 minutes. next eligible student on waitlist is promoted and emailed.</p>
     <div class="section-label">weekly auto-reset</div>
     <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">all reservations clear automatically each sunday night.</p>
     <div class="section-label">pin management</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">pin is verified server-side via edge function — never compared in the browser.</p>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">to change your pin: go to supabase → edge functions → manage secrets → update PIN_HASH with the new sha-256 hash.</p>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">pin is verified server-side — never compared in the browser.</p>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">to change: supabase → edge functions → manage secrets → update PIN_HASH.</p>
     <div style="margin-top:8px;background:var(--bg2);border-radius:8px;padding:.75rem 1rem;">
       <p style="font-size:12px;color:var(--ink3);margin-bottom:6px">generate a new hash:</p>
       <div style="display:flex;gap:8px">
@@ -765,14 +716,12 @@ function renderSecurityLog(){
       <button class="btn btn-sm" onclick="exportLog()"><i class="ti ti-download" aria-hidden="true"></i> export csv</button>
     </div>`;
 }
-
 function clearLog(){ if(!requireSession()) return; securityLog=[]; renderSecurityLog(); }
 function exportLog(){
   if(!requireSession()) return;
   const csv=['time,isoTime,type,detail',...securityLog.map(e=>`"${e.time}","${e.isoTime}","${e.type}","${e.detail}"`)].join('\n');
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='kinsal-log.csv'; a.click();
 }
-
 async function generatePinHash(){
   const val=document.getElementById('new-pin').value.trim();
   if(!/^\d{4,6}$/.test(val)){ showToast('pin must be 4–6 digits'); return; }
@@ -780,9 +729,8 @@ async function generatePinHash(){
   document.getElementById('new-pin').value='';
   const out=document.getElementById('pin-hash-out');
   out.style.display='block';
-  out.innerHTML=`copy this hash into supabase → edge functions → manage secrets → PIN_HASH:<br><strong>${hash}</strong>`;
+  out.innerHTML=`copy this into supabase → edge functions → manage secrets → PIN_HASH:<br><strong>${hash}</strong>`;
 }
-
 async function adminCancel(k){
   if(!requireSession()) return;
   await db.from('reservations').delete().eq('key',k);
@@ -790,7 +738,6 @@ async function adminCancel(k){
   await promoteWaitlist(k); logEvent('admin-cancel','Instructor cancelled '+k);
   renderDash(); renderSlots();
 }
-
 async function removeStudent(id){
   if(!requireSession()) return;
   const stu=students.find(s=>s.id===id);
@@ -799,7 +746,6 @@ async function removeStudent(id){
   logEvent('roster','Removed student: '+stu?.name);
   renderDash();
 }
-
 async function addStudent(){
   if(!requireSession()) return;
   const name=sanitize(document.getElementById('new-student-name').value);
@@ -817,7 +763,6 @@ async function addStudent(){
   logEvent('roster','Added student: '+name);
   renderDash();
 }
-
 async function manualReset(){
   if(!requireSession()) return;
   pendingAction=async()=>{
@@ -829,7 +774,6 @@ async function manualReset(){
   };
   openModal('clear all reservations','this will remove every reservation and waitlist entry. cannot be undone.','yes, clear all');
 }
-
 function showDashTab(tab,btn){
   if(!requireSession()) return;
   document.querySelectorAll('.tab').forEach(t=>{ t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
@@ -839,8 +783,6 @@ function showDashTab(tab,btn){
   });
   if(tab==='security') renderSecurityLog();
 }
-
-/* ── MODAL ───────────────────────────────────────────────────── */
 function openModal(title,body,confirmLabel){
   document.getElementById('modal-title').textContent=title;
   document.getElementById('modal-body').textContent=body;
@@ -852,15 +794,12 @@ function closeModal(){ document.getElementById('modal-overlay').classList.remove
 document.getElementById('modal-confirm').onclick=()=>{ if(pendingAction) pendingAction(); closeModal(); };
 document.getElementById('modal-overlay').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeModal(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
-
 function restartCountdownDisplays(){
   Object.keys(noShowTimers).forEach(k=>{
     const el=document.getElementById('cd-'+k);
     if(el){ const r=noShowTimers[k].end-Date.now(); el.textContent=r>0?Math.ceil(r/60000)+'m':'releasing...'; }
   });
 }
-
-/* ── INIT ────────────────────────────────────────────────────── */
 async function init(){
   await checkWeeklyReset();
   await loadStudents();
@@ -868,7 +807,7 @@ async function init(){
 }
 init();
 </script>
-  <div style="text-align:center;padding:2rem 0 .5rem;font-size:11px;color:var(--ink3);letter-spacing:0.08em;font-family:var(--font-body)">
+<div style="text-align:center;padding:2rem 0 .5rem;font-size:11px;color:var(--ink3);letter-spacing:0.08em;font-family:var(--font-body)">
   created by Salma Repole
 </div>
 </body>
