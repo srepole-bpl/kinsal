@@ -13,10 +13,10 @@
 import { json, preflight } from "../_shared/cors.ts";
 import { serviceClient } from "../_shared/db.ts";
 import { promoteAndNotify } from "../_shared/waitlist.ts";
+import { loadWheelIds } from "../_shared/wheels.ts";
 
 const STUDIO_TZ = "America/New_York"; // change if the studio is elsewhere
 const STUDIO_DAYS = ["Tuesday", "Thursday", "Saturday", "Sunday"];
-const WHEELS = ["Shimpo", "Pacifica", "BHR"];
 const SLOTS: Record<string, { start: number; end: number }> = {
   am: { start: 9, end: 13 },
   pm: { start: 16, end: 20 },
@@ -55,8 +55,15 @@ function withinWindow(day: string, slotId: string): boolean {
   return minutes >= openMin && minutes < closeMin;
 }
 
-function validSlot(day: string, slotId: string, wheel: string): boolean {
-  return STUDIO_DAYS.includes(day) && !!SLOTS[slotId] && WHEELS.includes(wheel);
+async function validSlot(
+  db: ReturnType<typeof serviceClient>,
+  day: string,
+  slotId: string,
+  wheelId: string,
+): Promise<boolean> {
+  if (!STUDIO_DAYS.includes(day) || !SLOTS[slotId]) return false;
+  const wheelIds = await loadWheelIds(db);
+  return wheelIds.has(wheelId);
 }
 
 Deno.serve(async (req) => {
@@ -97,7 +104,9 @@ Deno.serve(async (req) => {
   const k = `${day}|${slotId}|${wheel}`;
 
   if (!studentId) return json({ success: false, error: "missing student" }, 400);
-  if (!validSlot(day, slotId, wheel)) return json({ success: false, error: "invalid slot" }, 400);
+  if (!(await validSlot(db, day, slotId, wheel))) {
+    return json({ success: false, error: "invalid slot" }, 400);
+  }
 
   // Confirm the student is real (and on the roster).
   const { data: stu } = await db

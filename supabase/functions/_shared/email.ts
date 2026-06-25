@@ -1,7 +1,11 @@
 // Sends the "a wheel opened up" email via Resend. Best-effort: if the key is
 // missing or Resend errors, we log and move on rather than failing the booking
 // flow. RESEND_API_KEY lives only in server env.
+import { wheelLabelForId } from "./wheels.ts";
+
+// deno-lint-ignore no-explicit-any
 export async function sendWaitlistEmail(
+  db: any,
   to: string,
   studentName: string,
   slotKey: string,
@@ -9,7 +13,8 @@ export async function sendWaitlistEmail(
   const apiKey = Deno.env.get("RESEND_API_KEY");
   if (!apiKey) return false;
 
-  const [day, slotId, wheel] = slotKey.split("|");
+  const [day, slotId, wheelId] = slotKey.split("|");
+  const wheelLabel = await wheelLabelForId(db, wheelId);
   const slotLabel = slotId === "am"
     ? "morning (9:00am – 1:00pm)"
     : "evening (4:00pm – 8:00pm)";
@@ -25,12 +30,12 @@ export async function sendWaitlistEmail(
       body: JSON.stringify({
         from: "Salma's Studio <ceramics@salmas.studio>",
         to,
-        subject: "a wheel just opened up",
+        subject: "a wheel opened up",
         html:
           `<div style="font-family:Georgia,serif;color:#2c2416;line-height:1.6">
             <p>hi ${first},</p>
             <p>a wheel opened up for <strong>${day}, ${slotLabel}</strong> on the
-            <strong>${wheel}</strong> wheel — and since you were next on the
+            <strong>${wheelLabel}</strong> wheel — and since you were next on the
             waitlist, the spot is now reserved for you.</p>
             <p>see you at the studio.</p>
             <p style="color:#9c8e7c;font-size:13px">— salma's studio</p>

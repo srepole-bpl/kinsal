@@ -45,6 +45,6 @@ export async function promoteAndNotify(db: any, slotKey: string): Promise<void> 
     .single();
 
   if (stu?.email) {
-    await sendWaitlistEmail(stu.email, stu.name ?? "", slotKey);
+    await sendWaitlistEmail(db, stu.email, stu.name ?? "", slotKey);
   }
 }

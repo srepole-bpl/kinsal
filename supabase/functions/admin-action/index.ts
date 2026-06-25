@@ -8,6 +8,12 @@ import { json, preflight } from "../_shared/cors.ts";
 import { serviceClient } from "../_shared/db.ts";
 import { verifyInstructorToken } from "../_shared/jwt.ts";
 import { promoteAndNotify } from "../_shared/waitlist.ts";
+import {
+  isValidWheelLabel,
+  MAX_WHEELS,
+  newWheelId,
+  sanitizeWheelLabel,
+} from "../_shared/wheels.ts";
 
 const MAX_STUDENTS = 200;
 
@@ -19,6 +25,17 @@ function isValidName(n: string): boolean {
 }
 function sanitizeName(s: string): string {
   return String(s).replace(/[<>"'&\/\\;`]/g, "").replace(/\s+/g, " ").trim().slice(0, 40);
+}
+
+// deno-lint-ignore no-explicit-any
+async function wheelHasBookings(db: any, wheelId: string): Promise<boolean> {
+  const pattern = `%|${wheelId}`;
+  const { data: res } = await db.from("reservations").select("key").like("key", pattern).limit(1);
+  if (res && res.length > 0) return true;
+  const { data: wl } = await db.from("waitlists").select("key").like("key", pattern).limit(1);
+  if (wl && wl.length > 0) return true;
+  const { data: ns } = await db.from("no_shows").select("key").like("key", pattern).limit(1);
+  return !!(ns && ns.length > 0);
 }
 
 Deno.serve(async (req) => {
@@ -131,6 +148,84 @@ Deno.serve(async (req) => {
     await db.from("reservations").delete().neq("key", "__none__");
     await db.from("waitlists").delete().neq("key", "__none__");
     return json({ success: true });
+  }
+
+  // ── WHEELS ───────────────────────────────────────────────────────────────────
+  if (action === "getWheels") {
+    const { data } = await db
+      .from("wheels")
+      .select("id, label, sort_order")
+      .order("sort_order", { ascending: true });
+    return json({ success: true, wheels: data || [] });
+  }
+
+  if (action === "saveWheels") {
+    let incoming: { id?: string; label?: string }[];
+    try {
+      incoming = JSON.parse(String(body.wheels || "[]"));
+    } catch {
+      return json({ success: false, error: "invalid wheels data" }, 400);
+    }
+    if (!Array.isArray(incoming) || incoming.length === 0) {
+      return json({ success: false, error: "at least one wheel is required" }, 400);
+    }
+    if (incoming.length > MAX_WHEELS) {
+      return json({ success: false, error: `maximum ${MAX_WHEELS} wheels` }, 400);
+    }
+
+    const normalized: { id: string; label: string; sort_order: number }[] = [];
+    const labelsSeen = new Set<string>();
+
+    for (let i = 0; i < incoming.length; i++) {
+      const label = sanitizeWheelLabel(String(incoming[i]?.label || ""));
+      if (!isValidWheelLabel(label)) {
+        return json({ success: false, error: `invalid wheel name: ${label || "(empty)"}` }, 400);
+      }
+      const labelKey = label.toLowerCase();
+      if (labelsSeen.has(labelKey)) {
+        return json({ success: false, error: "wheel names must be unique" }, 409);
+      }
+      labelsSeen.add(labelKey);
+
+      let id = String(incoming[i]?.id || "").trim();
+      if (!id) id = newWheelId();
+      normalized.push({ id, label, sort_order: i });
+    }
+
+    const { data: existing } = await db.from("wheels").select("id");
+    const existingIds = new Set((existing || []).map((w: { id: string }) => w.id));
+    const newIds = new Set(normalized.map((w) => w.id));
+
+    for (const oldId of existingIds) {
+      if (newIds.has(oldId)) continue;
+      if (await wheelHasBookings(db, oldId)) {
+        return json({
+          success: false,
+          error: `cannot remove wheel with active bookings or waitlists`,
+        }, 409);
+      }
+    }
+
+    for (const w of normalized) {
+      const { error } = await db.from("wheels").upsert({
+        id: w.id,
+        label: w.label,
+        sort_order: w.sort_order,
+      });
+      if (error) return json({ success: false, error: "could not save wheels" }, 500);
+    }
+
+    for (const oldId of existingIds) {
+      if (!newIds.has(oldId)) {
+        await db.from("wheels").delete().eq("id", oldId);
+      }
+    }
+
+    const { data: wheels } = await db
+      .from("wheels")
+      .select("id, label, sort_order")
+      .order("sort_order", { ascending: true });
+    return json({ success: true, wheels: wheels || [] });
   }
 
   return json({ success: false, error: "unknown action" }, 400);
