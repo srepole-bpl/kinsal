@@ -211,6 +211,16 @@ input[type=text],input[type=password],input[type=email]{padding:9px 12px;border-
 </div>
 
 <script>
+/* ──────────────────────────────────────────────────────────────────────────
+   SECURITY MODEL (read me)
+   • The anon key below is PUBLIC by design. It is now powerless: RLS allows
+     anon to READ the grid only. It cannot write anything.
+   • Every write goes through an edge function. Student writes → manage-booking.
+     Instructor writes → admin-action, which verifies a SIGNED token the server
+     issued at PIN time. The browser cannot forge that token.
+   • No-show release and the weekly reset run server-side (pg_cron). The browser
+     no longer performs destructive deletes.
+   ────────────────────────────────────────────────────────────────────────── */
 const SUPABASE_URL = 'https://dhottawheezvotadbsqq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRob3R0YXdoZWV6dm90YWRic3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2NjYzODQsImV4cCI6MjA5NTI0MjM4NH0.9dlYpaPafXNCfS395N-nux4x4ZHJRgNOD_qJTQMMfHI';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -225,10 +235,10 @@ const WHEELS = ['Shimpo','Pacifica','BHR'];
 const RATE_LIMIT_MS      = 3000;
 const NOSHOW_RELEASE_MIN = 30;
 const MAX_LOG_ENTRIES    = 100;
-const MAX_STUDENTS       = 200;
 const MAX_NAME_LEN       = 40;
 
 let students=[], reservations={}, waitlists={};
+let roster=[], rosterMap={};
 let noShowTimers={}, countdownIntervals={};
 let currentStudent=null, currentDay=DAYS[0], pendingAction=null;
 let instructorToken=null, instructorExpires=0, sessionTimer=null;
@@ -240,6 +250,8 @@ function sanitize(s){ return String(s).replace(/[<>"'&\/\\;`]/g,'').replace(/\s+
 function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
 function isValidName(n){ return /^[a-zA-Z\s'\-\.]{2,40}$/.test(n); }
 function key(d,s,w){ return `${d}|${s}|${w}`; }
+function nameFor(id){ return rosterMap[id]?.name || students.find(s=>s.id===id)?.name || '—'; }
+function emailFor(id){ return rosterMap[id]?.email || ''; }
 
 function logEvent(type,detail){
   const now=new Date();
@@ -282,24 +294,30 @@ async function sha256(str){
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-async function checkWeeklyReset(){
-  const weekStart=getWeekStart(new Date());
-  const lastReset=localStorage.getItem('kinsal_last_reset');
-  if(lastReset!==weekStart){
-    await db.from('reservations').delete().neq('key','__none__');
-    await db.from('waitlists').delete().neq('key','__none__');
-    localStorage.setItem('kinsal_last_reset',weekStart);
-    logEvent('system','Weekly reset — reservations cleared');
-  }
+/* ── EDGE CALLS ─────────────────────────────────────────────────────────────
+   Public call carries only the anon key. Admin call additionally carries the
+   signed instructor token, which the server verifies before doing anything. */
+async function edgeCall(fn,payload){
+  const res=await fetch(`${EDGE}/${fn}`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY},
+    body:JSON.stringify(payload)
+  });
+  let data={}; try{ data=await res.json(); }catch{}
+  return {status:res.status,data};
 }
-function getWeekStart(date){
-  const d=new Date(date);
-  d.setDate(d.getDate()-d.getDay()); d.setHours(0,0,0,0);
-  return d.toISOString().split('T')[0];
+async function adminCall(action,params={}){
+  if(!requireSession()) return null;
+  try{
+    const {status,data}=await edgeCall('admin-action',{token:instructorToken,action,...params});
+    if(status===401){ showToast('session expired — sign in again'); instructorLogout(); return null; }
+    return data;
+  }catch(e){ logEvent('admin-error',action+': '+e.message); showToast('action failed'); return null; }
 }
 
+/* ── DATA LOADERS (reads only; RLS allows anon SELECT) ─────────────────────── */
 async function loadStudents(){
-  const {data,error}=await db.from('students').select('*').order('name');
+  const {data,error}=await db.from('student_directory').select('*').order('name');
   if(error){ logEvent('db-error','loadStudents: '+error.message); return; }
   students=data||[];
 }
@@ -317,6 +335,16 @@ async function loadWaitlists(){
   DAYS.forEach(d=>SLOTS.forEach(s=>WHEELS.forEach(w=>{ waitlists[key(d,s.id,w)]=[]; })));
   (data||[]).forEach(r=>{ if(waitlists[r.key]) waitlists[r.key].push(r.student_id); });
 }
+async function loadRoster(){
+  const data=await adminCall('roster');
+  if(data?.success){
+    roster=data.roster||[];
+    rosterMap={};
+    roster.forEach(r=>{ rosterMap[r.id]={name:r.name,email:r.email}; });
+  }
+}
+
+/* student's own stats — reads only their own reservation count + no-shows */
 async function getStudentStats(studentId){
   const {data:allRes}=await db.from('reservations').select('key').eq('student_id',studentId);
   const weeklyHours=(allRes||[]).length*4;
@@ -326,34 +354,43 @@ async function getStudentStats(studentId){
   return {weeklyHours,noShowCount,lastVisit};
 }
 
+/* ── STUDENT LOGIN (via manage-booking lookup) ────────────────────────────── */
 async function lookupStudent(){
   const raw=document.getElementById('email-input').value.trim().toLowerCase();
   if(!isValidEmail(raw)){ showInfoBanner('please enter a valid email address'); return; }
   if(isRateLimited('lookup')){ showRateBanner('please wait before trying again'); return; }
   const btn=document.getElementById('lookup-btn');
   btn.innerHTML='<span class="spinner"></span>looking up…'; btn.disabled=true;
-  const {data,error}=await db.from('students').select('*').eq('email',raw).single();
+  let data={};
+  try{ ({data}=await edgeCall('manage-booking',{action:'lookup',email:raw})); }
+  catch(e){ showInfoBanner('connection error — try again'); btn.textContent='continue'; btn.disabled=false; return; }
   btn.textContent='continue'; btn.disabled=false;
-  if(error||!data){ showInfoBanner('email not found — contact your instructor'); logEvent('login-fail','Email not found: '+raw); return; }
-  currentStudent=data;
-  logEvent('login','Student signed in: '+data.name);
+  if(!data.found){ showInfoBanner('email not found — contact your instructor'); logEvent('login-fail','Email not found'); return; }
+  currentStudent=data.student;
+  logEvent('login','Student signed in: '+currentStudent.name);
   await enterStudentView();
 }
 async function enterStudentView(){
-  await loadReservations(); await loadWaitlists();
+  await loadStudents(); await loadReservations(); await loadWaitlists();
   document.getElementById('student-greeting').textContent='welcome, '+currentStudent.name.split(' ')[0].toLowerCase();
   document.getElementById('student-email-display').textContent=currentStudent.email;
   document.getElementById('student-avatar').textContent=currentStudent.name.split(' ').map(n=>n[0]).join('').toUpperCase();
-  const stats=await getStudentStats(currentStudent.id);
-  document.getElementById('student-hours').innerHTML=`
-    <div class="hours-tile"><div class="hours-val">${stats.weeklyHours}</div><div class="hours-label">hrs this week</div></div>
-    <div class="hours-tile"><div class="hours-val">${stats.noShowCount}</div><div class="hours-label">no-shows</div></div>
-    <div class="hours-tile"><div class="hours-val" style="font-size:13px;padding-top:4px">${stats.lastVisit}</div><div class="hours-label">last visit</div></div>`;
+  await refreshStudentStats();
   showView('student-view'); renderDayTabs(); renderSlots();
 }
 function signOutStudent(){ currentStudent=null; document.getElementById('email-input').value=''; showView('email-view'); logEvent('logout','Student signed out'); }
 
-/* ── BOOKING WINDOW — open 2hrs before start, closes 1hr before end ── */
+async function refreshStudentStats(){
+  if(!currentStudent) return;
+  const stats=await getStudentStats(currentStudent.id);
+  const el=document.getElementById('student-hours');
+  if(el) el.innerHTML=`
+    <div class="hours-tile"><div class="hours-val">${stats.weeklyHours}</div><div class="hours-label">hrs this week</div></div>
+    <div class="hours-tile"><div class="hours-val">${stats.noShowCount}</div><div class="hours-label">no-shows</div></div>
+    <div class="hours-tile"><div class="hours-val" style="font-size:13px;padding-top:4px">${stats.lastVisit}</div><div class="hours-label">last visit</div></div>`;
+}
+
+/* ── BOOKING WINDOW (client preview only; the SERVER enforces it for real) ── */
 function canBookClientSide(day,slotId){
   const now=new Date();
   const dayIdx=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -370,7 +407,6 @@ function canBookClientSide(day,slotId){
   const diffHrs=(slotStart-now)/3600000;
   return diffHrs<=2&&diffHrs>0;
 }
-
 function studentHasBookingToday(day){
   return SLOTS.some(s=>WHEELS.some(w=>reservations[key(day,s.id,w)]===currentStudent?.id));
 }
@@ -385,16 +421,10 @@ async function bookSlot(day,slotId,wheel){
   if(reservations[k]){ showRateBanner('that slot was just taken',true); return; }
   const sl=SLOTS.find(s=>s.id===slotId);
   pendingAction=async()=>{
-    const res=await fetch(`${EDGE}/manage-booking`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY},
-      body:JSON.stringify({action:'book',studentId:currentStudent.id,day,slotId,wheel})
-    });
-    const data=await res.json();
-    if(!data.success){ showRateBanner(data.error||'booking failed',true); logEvent('booking-fail',data.error); return; }
-    reservations[k]=currentStudent.id;
+    const {data}=await edgeCall('manage-booking',{action:'book',studentId:currentStudent.id,day,slotId,wheel});
+    if(!data.success){ showRateBanner(data.error||'booking failed',true); logEvent('booking-fail',data.error); await loadReservations(); renderSlots(); return; }
     logEvent('booking',`${currentStudent.name} reserved ${wheel} · ${day} ${sl?.label}`);
-    await refreshStudentStats(); renderSlots();
+    await loadReservations(); await refreshStudentStats(); renderSlots();
   };
   openModal('confirm reservation',`reserve ${wheel} for the ${sl?.label} slot (${sl?.time}) on ${day}?`,'confirm');
 }
@@ -404,18 +434,11 @@ async function cancelRes(day,slotId,wheel){
   const k=key(day,slotId,wheel);
   if(reservations[k]!==currentStudent?.id){ logEvent('tamper-attempt','Cancel on unowned slot'); showRateBanner('that reservation is not yours',true); return; }
   pendingAction=async()=>{
-    const res=await fetch(`${EDGE}/manage-booking`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY},
-      body:JSON.stringify({action:'cancel',studentId:currentStudent.id,day,slotId,wheel})
-    });
-    const data=await res.json();
+    const {data}=await edgeCall('manage-booking',{action:'cancel',studentId:currentStudent.id,day,slotId,wheel});
     if(!data.success){ showRateBanner(data.error||'cancel failed',true); return; }
-    reservations[k]=null;
     clearInterval(countdownIntervals[k]); delete countdownIntervals[k]; delete noShowTimers[k];
-    await notifyWaitlist(k);
     logEvent('cancel',`${currentStudent.name} cancelled ${wheel} · ${day} ${slotId}`);
-    renderSlots();
+    await loadReservations(); await loadWaitlists(); await refreshStudentStats(); renderSlots();
   };
   openModal('cancel reservation','are you sure you want to cancel your reservation?','yes, cancel');
 }
@@ -425,70 +448,30 @@ async function joinWaitlist(day,slotId,wheel){
   if(isRateLimited('waitlist')){ showRateBanner('please wait',true); return; }
   const k=key(day,slotId,wheel);
   if((waitlists[k]||[]).includes(currentStudent.id)){ showRateBanner('already on this waitlist',true); return; }
-  if(!waitlists[k]) waitlists[k]=[];
-  waitlists[k].push(currentStudent.id);
-  await db.from('waitlists').upsert({key:k,student_id:currentStudent.id,position:waitlists[k].length-1});
+  const {data}=await edgeCall('manage-booking',{action:'join_waitlist',studentId:currentStudent.id,day,slotId,wheel});
+  if(!data.success){ showRateBanner(data.error||'could not join waitlist',true); return; }
   logEvent('waitlist',`${currentStudent.name} joined waitlist · ${k}`);
-  renderSlots();
+  await loadWaitlists(); renderSlots();
 }
 
-async function notifyWaitlist(slotKey){
-  try {
-    await fetch(`${EDGE}/notify-waitlist`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY},
-      body:JSON.stringify({slotKey})
-    });
-  } catch(e){ logEvent('notify-error','notify-waitlist failed: '+e.message); }
-}
-
-async function promoteWaitlist(k){
-  await loadWaitlists();
-  if(!waitlists[k]||waitlists[k].length===0) return;
-  const [day]=k.split('|');
-  const nextId=waitlists[k].find(id=>!SLOTS.some(s=>WHEELS.some(w=>reservations[key(day,s.id,w)]===id)));
-  if(!nextId){ logEvent('waitlist','No eligible student for '+k); return; }
-  await db.from('reservations').upsert({key:k,student_id:nextId});
-  await db.from('waitlists').delete().eq('key',k).eq('student_id',nextId);
-  reservations[k]=nextId;
-  waitlists[k]=waitlists[k].filter(id=>id!==nextId);
-  const stu=students.find(s=>s.id===nextId);
-  logEvent('promote',`${stu?.name||'student'} promoted from waitlist · ${k}`);
-  showToast((stu?stu.name:'next student')+' promoted from waitlist');
-  await notifyWaitlist(k);
-}
-
-async function refreshStudentStats(){
-  if(!currentStudent) return;
-  const stats=await getStudentStats(currentStudent.id);
-  const el=document.getElementById('student-hours');
-  if(el) el.innerHTML=`
-    <div class="hours-tile"><div class="hours-val">${stats.weeklyHours}</div><div class="hours-label">hrs this week</div></div>
-    <div class="hours-tile"><div class="hours-val">${stats.noShowCount}</div><div class="hours-label">no-shows</div></div>
-    <div class="hours-tile"><div class="hours-val" style="font-size:13px;padding-top:4px">${stats.lastVisit}</div><div class="hours-label">last visit</div></div>`;
-}
-
-function triggerNoShow(k){
+/* ── NO-SHOW (instructor marks it; SERVER cron releases it after 30 min) ──── */
+async function triggerNoShow(k){
   if(!requireSession()) return;
-  const stuId=reservations[k], stu=students.find(s=>s.id===stuId);
-  noShowTimers[k]={end:Date.now()+NOSHOW_RELEASE_MIN*60000};
-  db.from('no_shows').insert({key:k,student_id:stuId,logged_at:new Date().toISOString()});
-  logEvent('no-show',`${stu?.name||'?'} marked no-show · ${k}`);
+  const data=await adminCall('noShow',{key:k});
+  if(!data?.success){ showToast(data?.error||'could not mark no-show'); return; }
+  logEvent('no-show','Marked no-show · '+k);
+  noShowTimers[k]={end:Date.now()+NOSHOW_RELEASE_MIN*60000}; // cosmetic countdown only
   clearInterval(countdownIntervals[k]);
-  countdownIntervals[k]=setInterval(async()=>{
-    const remaining=noShowTimers[k]?.end-Date.now();
+  countdownIntervals[k]=setInterval(()=>{
     const el=document.getElementById('cd-'+k);
+    const remaining=noShowTimers[k]?.end-Date.now();
     if(el) el.textContent=remaining>0?Math.ceil(remaining/60000)+'m':'releasing...';
-    if(remaining<=0){
-      clearInterval(countdownIntervals[k]); delete countdownIntervals[k];
-      await db.from('reservations').delete().eq('key',k);
-      reservations[k]=null; delete noShowTimers[k];
-      await promoteWaitlist(k); renderSlots(); renderDash();
-    }
+    if(remaining<=0) clearInterval(countdownIntervals[k]);
   },10000);
-  renderSlots(); renderDash();
+  renderDash(); renderSlots();
 }
 
+/* ── PIN AUTH ──────────────────────────────────────────────────────────────── */
 function showPinView(){
   document.getElementById('lockout-banner').style.display='none';
   document.getElementById('pin-error').textContent='';
@@ -511,41 +494,41 @@ async function checkPin(val){
   if(val.length<4) return;
   document.getElementById('pin-input').value='';
   const hashed=await sha256(val);
-  let result;
-  try {
-    const res=await fetch(`${EDGE}/verify-pin`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY},
-      body:JSON.stringify({pinHash:hashed})
-    });
-    result=await res.json();
-  } catch(e){
-    document.getElementById('pin-error').textContent='connection error — try again';
-    return;
-  }
+  let status=0,result={};
+  try{ ({status,data:result}=await edgeCall('verify-pin',{pinHash:hashed})); }
+  catch(e){ document.getElementById('pin-error').textContent='connection error — try again'; return; }
+
   if(result.success){
     pinAttempts=0; instructorToken=result.token; instructorExpires=result.expires;
     logEvent('auth-success','Instructor authenticated');
     await startInstructorSession();
+    return;
+  }
+  // Server says locked (covers attempts made from any device, not just this one).
+  if(status===429&&result.lockedUntil){
+    pinLockedUntil=result.lockedUntil;
+    document.getElementById('lockout-msg').textContent='too many attempts — locked for 15 minutes';
+    document.getElementById('lockout-banner').style.display='block';
+    document.getElementById('pin-error').textContent='';
+    logEvent('lockout','PIN locked by server'); return;
+  }
+  pinAttempts++;
+  logEvent('auth-fail',`Wrong PIN attempt ${pinAttempts}`);
+  if(pinAttempts>=5){
+    pinLockedUntil=now+(5*60*1000); pinAttempts=0;
+    document.getElementById('lockout-msg').textContent='too many attempts — locked for 5 minutes';
+    document.getElementById('lockout-banner').style.display='block';
+    document.getElementById('pin-error').textContent='';
+    logEvent('lockout','PIN locked (client)');
   } else {
-    pinAttempts++;
-    logEvent('auth-fail',`Wrong PIN attempt ${pinAttempts}`);
-    if(pinAttempts>=5){
-      pinLockedUntil=now+(5*60*1000); pinAttempts=0;
-      document.getElementById('lockout-msg').textContent='too many attempts — locked for 5 minutes';
-      document.getElementById('lockout-banner').style.display='block';
-      document.getElementById('pin-error').textContent='';
-      logEvent('lockout','PIN locked out');
-    } else {
-      document.getElementById('pin-error').textContent=`incorrect — ${5-pinAttempts} attempt${5-pinAttempts>1?'s':''} remaining`;
-    }
+    document.getElementById('pin-error').textContent=`incorrect — ${5-pinAttempts} attempt${5-pinAttempts>1?'s':''} remaining`;
   }
 }
 
 async function startInstructorSession(){
   clearInterval(sessionTimer);
   sessionTimer=setInterval(tickSession,30000);
-  await loadStudents(); await loadReservations(); await loadWaitlists();
+  await loadStudents(); await loadReservations(); await loadWaitlists(); await loadRoster();
   showView('instructor-view'); renderDash(); updateSessionBar();
 }
 function tickSession(){
@@ -556,12 +539,13 @@ function updateSessionBar(){
   const r=Math.max(0,Math.ceil((instructorExpires-Date.now())/60000));
   document.getElementById('session-bar').textContent=`session expires in ${r} min`;
 }
-function instructorLogout(){ clearInterval(sessionTimer); sessionTimer=null; instructorToken=null; instructorExpires=0; logEvent('auth-logout','Instructor signed out'); showView('email-view'); }
+function instructorLogout(){ clearInterval(sessionTimer); sessionTimer=null; instructorToken=null; instructorExpires=0; roster=[]; rosterMap={}; logEvent('auth-logout','Instructor signed out'); showView('email-view'); }
 function requireSession(){
   if(!instructorToken||Date.now()>=instructorExpires){ instructorLogout(); return false; }
   return true;
 }
 
+/* ── RENDER: STUDENT GRID ──────────────────────────────────────────────────── */
 function renderDayTabs(){
   document.getElementById('day-tabs').innerHTML=DAYS.map(d=>
     `<button class="day-tab${d===currentDay?' active':''}" onclick="setDay('${d}')" role="tab" aria-selected="${d===currentDay}">${d.toLowerCase()}</button>`
@@ -581,9 +565,8 @@ function renderSlots(){
       const k=key(currentDay,s.id,w),booked=reservations[k],wl=waitlists[k]||[];
       const isMe=booked===currentStudent?.id,inNS=noShowTimers[k]!==undefined;
       if(booked){
-        const stu=students.find(st=>st.id===booked);
         html+=`<div class="wheel-slot ${isMe?'mine':'booked'}">
-          <div><div class="student-name">${esc(stu?.name||'—')}</div><div class="muted">${esc(w)}</div></div>
+          <div><div class="student-name">${esc(nameFor(booked))}</div><div class="muted">${esc(w)}</div></div>
           <div style="display:flex;gap:4px;align-items:center">
             ${inNS?`<span class="countdown" id="cd-${k}">releasing soon</span>`:''}
             ${isMe?`<button class="btn btn-sm btn-danger" onclick="cancelRes('${esc(currentDay)}','${esc(s.id)}','${esc(w)}')">cancel</button>`:''}
@@ -614,6 +597,7 @@ function renderSlots(){
   restartCountdownDisplays();
 }
 
+/* ── RENDER: INSTRUCTOR DASHBOARD ──────────────────────────────────────────── */
 async function renderDash(){
   if(!requireSession()) return;
   let total=0,booked=0,wlCount=0;
@@ -631,43 +615,43 @@ async function renderDash(){
     todayHtml+=`<div class="section-label">${esc(d)}</div>`;
     SLOTS.forEach(s=>WHEELS.forEach(w=>{
       const k=key(d,s.id,w),bId=reservations[k];
-      const stu=bId?students.find(st=>st.id===bId):null;
       const wl=waitlists[k]||[],isNS=noShowTimers[k]!==undefined;
+      const nm=bId?nameFor(bId):null;
       todayHtml+=`<div class="card" style="margin-bottom:8px">
         <div class="flex-between" style="margin-bottom:6px">
           <span style="font-size:13px;font-weight:500">${esc(w)} · ${esc(s.label)}</span>
           <span style="font-size:11.5px;color:var(--ink3)">${esc(s.time)}</span>
         </div>
-        ${stu?`<div class="flex-between">
+        ${bId?`<div class="flex-between">
           <div style="display:flex;align-items:center;gap:8px">
-            <div class="avatar">${esc(stu.name.split(' ').map(n=>n[0]).join(''))}</div>
-            <div><div class="student-name">${esc(stu.name)}</div><div class="muted">${esc(stu.email||'')}</div></div>
+            <div class="avatar">${esc((nm||'?').split(' ').map(n=>n[0]).join(''))}</div>
+            <div><div class="student-name">${esc(nm)}</div><div class="muted">${esc(emailFor(bId))}</div></div>
             ${isNS?`<span class="countdown" id="cd-${k}">releasing...</span>`:''}
           </div>
           <div style="display:flex;gap:6px">
-            ${!isNS?`<button class="btn btn-sm" onclick="triggerNoShow('${k}')">mark no-show</button>`:''}
-            <button class="btn btn-sm btn-danger" onclick="adminCancel('${k}')">cancel</button>
+            ${!isNS?`<button class="btn btn-sm" onclick="triggerNoShow('${esc(k)}')">mark no-show</button>`:''}
+            <button class="btn btn-sm btn-danger" onclick="adminCancel('${esc(k)}')">cancel</button>
           </div>
         </div>`:`<span class="muted">available</span>`}
-        ${wl.length?`<div class="muted" style="margin-top:6px;font-size:11.5px"><i class="ti ti-list" aria-hidden="true"></i> waitlist: ${wl.map(id=>esc(students.find(s=>s.id===id)?.name||'?')).join(', ')}</div>`:''}
+        ${wl.length?`<div class="muted" style="margin-top:6px;font-size:11.5px"><i class="ti ti-list" aria-hidden="true"></i> waitlist: ${wl.map(id=>esc(nameFor(id))).join(', ')}</div>`:''}
       </div>`;
     }));
   });
   document.getElementById('dash-today').innerHTML=todayHtml;
   restartCountdownDisplays();
 
+  // roster (names, emails, stats come from the server roster call)
   let rosterHtml='<div class="card">';
-  for(const s of students){
-    const stats=await getStudentStats(s.id);
+  roster.forEach(r=>{
     rosterHtml+=`<div class="roster-row">
       <div style="display:flex;align-items:center;gap:10px">
-        <div class="avatar">${esc(s.name.split(' ').map(n=>n[0]).join(''))}</div>
-        <div><div class="student-name">${esc(s.name)}</div>
-        <div class="muted">${esc(s.email||'')} · ${stats.weeklyHours}h this week · ${stats.noShowCount} no-shows · last: ${stats.lastVisit}</div></div>
+        <div class="avatar">${esc(r.name.split(' ').map(n=>n[0]).join(''))}</div>
+        <div><div class="student-name">${esc(r.name)}</div>
+        <div class="muted">${esc(r.email||'')} · ${r.weeklyHours}h this week · ${r.noShowCount} no-shows · last: ${esc(r.lastVisit)}</div></div>
       </div>
-      <button class="btn btn-sm btn-danger" onclick="removeStudent('${esc(s.id)}')">remove</button>
+      <button class="btn btn-sm btn-danger" onclick="removeStudent('${esc(r.id)}')">remove</button>
     </div>`;
-  }
+  });
   rosterHtml+=`<div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
     <input type="text" id="new-student-name" placeholder="full name" maxlength="40" autocomplete="off">
     <input type="email" id="new-student-email" placeholder="email" autocomplete="off">
@@ -675,24 +659,25 @@ async function renderDash(){
   </div></div>`;
   document.getElementById('dash-roster').innerHTML=rosterHtml;
 
-  const {data:nsData}=await db.from('no_shows').select('*,students(name)').order('logged_at',{ascending:false}).limit(30);
+  // no-shows (rows are anon-readable; names resolved from roster)
+  const {data:nsData}=await db.from('no_shows').select('key,student_id,logged_at').order('logged_at',{ascending:false}).limit(30);
   document.getElementById('dash-noshows').innerHTML=!nsData||nsData.length===0
     ?'<p class="muted">no no-shows recorded.</p>'
     :nsData.map(ns=>{
         const parts=ns.key.split('|');
-        return `<div class="no-show-row"><i class="ti ti-alert-triangle" style="color:var(--amber)" aria-hidden="true"></i><span><strong>${esc(ns.students?.name||'unknown')}</strong> · ${esc(parts[0])} ${esc(parts[1])} · ${new Date(ns.logged_at).toLocaleString()}</span></div>`;
+        return `<div class="no-show-row"><i class="ti ti-alert-triangle" style="color:var(--amber)" aria-hidden="true"></i><span><strong>${esc(nameFor(ns.student_id))}</strong> · ${esc(parts[0])} ${esc(parts[1])} · ${new Date(ns.logged_at).toLocaleString()}</span></div>`;
       }).join('');
 
   document.getElementById('dash-settings').innerHTML=`<div class="card">
     <div class="section-label">booking window</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">opens 2 hours before each slot starts. closes 1 hour before the slot ends.</p>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">opens 2 hours before each slot starts. closes 1 hour before the slot ends. enforced server-side.</p>
     <div class="section-label">no-show window</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">slot releases after 30 minutes. next eligible student on waitlist is promoted and emailed.</p>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">slot releases after 30 minutes via a server job, and the next eligible student on the waitlist is promoted and emailed.</p>
     <div class="section-label">weekly auto-reset</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">all reservations clear automatically each sunday night.</p>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">all reservations clear automatically each sunday night via a server job.</p>
     <div class="section-label">pin management</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">pin is verified server-side — never compared in the browser.</p>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">to change: supabase → edge functions → manage secrets → update PIN_HASH.</p>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">the pin is verified server-side — never compared in the browser.</p>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">to change it: generate a hash below, then paste it into supabase → edge functions → manage secrets → PIN_HASH.</p>
     <div style="margin-top:8px;background:var(--bg2);border-radius:8px;padding:.75rem 1rem;">
       <p style="font-size:12px;color:var(--ink3);margin-bottom:6px">generate a new hash:</p>
       <div style="display:flex;gap:8px">
@@ -708,7 +693,7 @@ async function renderDash(){
 
 function renderSecurityLog(){
   if(!requireSession()) return;
-  const typeClass={'auth-success':'log-ok','promote':'log-ok','booking':'log-ok','auth-fail':'log-fail','lockout':'log-fail','tamper-attempt':'log-fail','rate-limit':'log-fail','no-show':'log-warn','cancel':'log-warn','admin-cancel':'log-warn','session':'log-warn','auth-logout':'log-warn'};
+  const typeClass={'auth-success':'log-ok','promote':'log-ok','booking':'log-ok','server-release':'log-ok','auth-fail':'log-fail','lockout':'log-fail','tamper-attempt':'log-fail','rate-limit':'log-fail','no-show':'log-warn','cancel':'log-warn','admin-cancel':'log-warn','session':'log-warn','auth-logout':'log-warn'};
   const html=securityLog.length===0?'<p class="muted" style="padding:.5rem">no events yet.</p>':securityLog.map(e=>`<div class="${typeClass[e.type]||''}">[${esc(e.time)}] <strong>${esc(e.type)}</strong> — ${esc(e.detail)}</div>`).join('');
   document.getElementById('dash-security').innerHTML=`
     <div class="section-label">event log (last ${MAX_LOG_ENTRIES} actions)</div>
@@ -716,7 +701,8 @@ function renderSecurityLog(){
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="btn btn-sm btn-danger" onclick="clearLog()">clear log</button>
       <button class="btn btn-sm" onclick="exportLog()"><i class="ti ti-download" aria-hidden="true"></i> export csv</button>
-    </div>`;
+    </div>
+    <p class="muted" style="margin-top:8px;font-size:11px">note: this log reflects actions taken in this browser session. the authoritative record lives server-side.</p>`;
 }
 function clearLog(){ if(!requireSession()) return; securityLog=[]; renderSecurityLog(); }
 function exportLog(){
@@ -733,19 +719,22 @@ async function generatePinHash(){
   out.style.display='block';
   out.innerHTML=`copy this into supabase → edge functions → manage secrets → PIN_HASH:<br><strong>${hash}</strong>`;
 }
+
+/* ── INSTRUCTOR WRITES — all go through admin-action (token verified) ───────── */
 async function adminCancel(k){
   if(!requireSession()) return;
-  await db.from('reservations').delete().eq('key',k);
-  reservations[k]=null; clearInterval(countdownIntervals[k]); delete countdownIntervals[k]; delete noShowTimers[k];
-  await promoteWaitlist(k); logEvent('admin-cancel','Instructor cancelled '+k);
-  renderDash(); renderSlots();
+  const data=await adminCall('adminCancel',{key:k});
+  if(!data?.success){ showToast(data?.error||'cancel failed'); return; }
+  clearInterval(countdownIntervals[k]); delete countdownIntervals[k]; delete noShowTimers[k];
+  logEvent('admin-cancel','Instructor cancelled '+k);
+  await loadReservations(); await loadWaitlists(); renderDash(); renderSlots();
 }
 async function removeStudent(id){
   if(!requireSession()) return;
-  const stu=students.find(s=>s.id===id);
-  await db.from('students').delete().eq('id',id);
-  students=students.filter(s=>s.id!==id);
-  logEvent('roster','Removed student: '+stu?.name);
+  const data=await adminCall('removeStudent',{id});
+  if(!data?.success){ showToast(data?.error||'could not remove'); return; }
+  logEvent('roster','Removed student '+id);
+  await loadStudents(); await loadReservations(); await loadWaitlists(); await loadRoster();
   renderDash();
 }
 async function addStudent(){
@@ -754,28 +743,25 @@ async function addStudent(){
   const email=document.getElementById('new-student-email').value.trim().toLowerCase();
   if(!isValidName(name)){ showToast('enter a valid name'); return; }
   if(!isValidEmail(email)){ showToast('enter a valid email'); return; }
-  if(students.length>=MAX_STUDENTS){ showToast('roster limit reached'); return; }
-  if(students.some(s=>s.email===email)){ showToast('email already registered'); return; }
-  const id='s'+Date.now();
-  const {error}=await db.from('students').insert({id,name,email});
-  if(error){ showToast('error adding student'); logEvent('db-error',error.message); return; }
-  students.push({id,name,email});
+  const data=await adminCall('addStudent',{name,email});
+  if(!data?.success){ showToast(data?.error||'could not add student'); return; }
   document.getElementById('new-student-name').value='';
   document.getElementById('new-student-email').value='';
   logEvent('roster','Added student: '+name);
-  renderDash();
+  await loadStudents(); await loadRoster(); renderDash();
 }
 async function manualReset(){
   if(!requireSession()) return;
   pendingAction=async()=>{
-    await db.from('reservations').delete().neq('key','__none__');
-    await db.from('waitlists').delete().neq('key','__none__');
-    await loadReservations(); await loadWaitlists();
+    const data=await adminCall('manualReset');
+    if(!data?.success){ showToast(data?.error||'reset failed'); return; }
     logEvent('manual-reset','Instructor cleared all reservations');
+    await loadReservations(); await loadWaitlists();
     showToast('all reservations cleared'); renderDash();
   };
   openModal('clear all reservations','this will remove every reservation and waitlist entry. cannot be undone.','yes, clear all');
 }
+
 function showDashTab(tab,btn){
   if(!requireSession()) return;
   document.querySelectorAll('.tab').forEach(t=>{ t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
@@ -785,6 +771,8 @@ function showDashTab(tab,btn){
   });
   if(tab==='security') renderSecurityLog();
 }
+
+/* ── MODAL ─────────────────────────────────────────────────────────────────── */
 function openModal(title,body,confirmLabel){
   document.getElementById('modal-title').textContent=title;
   document.getElementById('modal-body').textContent=body;
@@ -802,28 +790,25 @@ function restartCountdownDisplays(){
     if(el){ const r=noShowTimers[k].end-Date.now(); el.textContent=r>0?Math.ceil(r/60000)+'m':'releasing...'; }
   });
 }
-  // realtime — auto-refresh when server releases a no-show slot
+
+/* ── REALTIME — refresh the grid when the SERVER changes reservations ────────
+   (e.g. a no-show release or waitlist promotion fired by the cron job).
+   This handler only READS + re-renders; it never writes. */
 db.channel('reservations-changes')
-  .on('postgres_changes', {
-    event: 'DELETE',
-    schema: 'public',
-    table: 'reservations'
-  }, async (payload) => {
-    const k = payload.old.key;
-    logEvent('server-release', 'Slot released by server: ' + k);
-    reservations[k] = null;
-    delete noShowTimers[k];
-    clearInterval(countdownIntervals[k]);
-    delete countdownIntervals[k];
-    await notifyWaitlist(k);
-    await promoteWaitlist(k);
+  .on('postgres_changes',{event:'*',schema:'public',table:'reservations'}, async (payload)=>{
+    if(payload.eventType==='DELETE' && payload.old?.key){
+      logEvent('server-release','Slot changed by server: '+payload.old.key);
+      delete noShowTimers[payload.old.key];
+      clearInterval(countdownIntervals[payload.old.key]);
+      delete countdownIntervals[payload.old.key];
+    }
+    await loadReservations(); await loadWaitlists();
     renderSlots();
-    if(instructorToken && Date.now() < instructorExpires) renderDash();
+    if(instructorToken && Date.now()<instructorExpires) renderDash();
   })
   .subscribe();
-  
+
 async function init(){
-  await checkWeeklyReset();
   await loadStudents();
   logEvent('system','Kinsal loaded');
 }
