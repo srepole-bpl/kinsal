@@ -54,9 +54,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-siz
 .badge-open{background:var(--green-light);color:var(--green);border:1px solid rgba(45,110,58,0.2)}
 .badge-full{background:var(--red-light);color:var(--red);border:1px solid rgba(140,44,30,0.18)}
 .badge-locked{background:var(--bg3);color:var(--ink3);border:1px solid var(--border)}
-.room-header{font-family:var(--font-head);font-size:13px;font-weight:500;color:var(--ink2);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border);letter-spacing:0.02em}
-.category-badge{font-size:10px;padding:2px 7px;border-radius:20px;background:var(--bg3);color:var(--ink3);margin-left:6px;text-transform:lowercase}
-.seat-count{font-size:11px;color:var(--ink3);margin-top:2px}
+.wheel-slot{padding:9px 11px;border-radius:8px 9px 8px 9px;border:1px solid var(--border);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;font-size:13px}
 .wheel-slot.booked{background:var(--green-light);border-color:rgba(45,110,58,0.25)}
 .wheel-slot.mine{background:var(--blue-light);border-color:rgba(58,114,196,0.3)}
 .wheel-slot.empty{background:var(--bg2)}
@@ -64,6 +62,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-siz
 .muted{color:var(--ink3);font-size:11.5px}
 .countdown{font-size:10.5px;color:var(--amber);font-weight:500;background:var(--amber-light);padding:2px 8px;border-radius:20px;border:1px solid rgba(122,72,0,0.18)}
 .section-label{font-size:10px;font-weight:500;color:var(--ink3);text-transform:lowercase;letter-spacing:0.1em;margin-bottom:7px;margin-top:16px}
+.room-header{font-family:var(--font-head);font-size:13px;font-weight:500;color:var(--ink2);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border);letter-spacing:0.02em}
 .pin-screen{max-width:300px;margin:3rem auto;text-align:center}
 .pin-screen-title{font-family:var(--font-head);font-size:20px;font-weight:500;color:var(--ink);margin-top:.75rem;letter-spacing:-0.01em}
 .pin-input{width:100%;padding:13px;font-size:22px;letter-spacing:.35em;text-align:center;border-radius:10px 11px 10px 12px;border:1px solid var(--border2);background:var(--surface);color:var(--ink);font-family:monospace;margin:1rem 0}
@@ -277,6 +276,14 @@ function eachResourceSlot(cb){ DAYS.forEach(d=>SLOTS.forEach(s=>resources.forEac
 function sanitizeResourceName(s){ return String(s).replace(/[<>"'&\/\\;|]/g,'').replace(/\s+/g,' ').trim().slice(0,40); }
 function sanitizeRoomName(s){ return sanitizeResourceName(s); }
 function bookedCount(k){ return (reservations[k]||[]).length; }
+function sortedResources(){
+  return [...resources].sort((a,b)=>{
+    const ra=rooms.find(rm=>rm.id===a.room_id)?.sort_order??0;
+    const rb=rooms.find(rm=>rm.id===b.room_id)?.sort_order??0;
+    if(ra!==rb) return ra-rb;
+    return a.sort_order-b.sort_order;
+  });
+}
 function isSlotFull(k,capacity){ return bookedCount(k)>=capacity; }
 function isBookedByMe(k){ return (reservations[k]||[]).includes(currentStudent?.id); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -625,54 +632,47 @@ function renderSlots(){
   let html='';
   SLOTS.forEach(s=>{
     const bookable=canBookClientSide(currentDay,s.id);
-    const allFull=resources.every(r=>isSlotFull(key(currentDay,s.id,r.id),r.capacity));
+    const allFull=sortedResources().every(r=>isSlotFull(key(currentDay,s.id,r.id),r.capacity));
     const badge=bookable?(allFull?'<span class="slot-label badge-full">full</span>':'<span class="slot-label badge-open">open</span>'):'<span class="slot-label badge-locked">opens 2 hrs before</span>';
     html+=`<div class="slot-card"><div class="slot-header"><span class="slot-time">${s.label} · ${s.time}</span>${badge}</div>`;
-    rooms.forEach(room=>{
-      const roomResources=resourcesByRoom[room.id]||[];
-      if(!roomResources.length) return;
-      html+=`<div class="room-header">${esc(room.label)}</div>`;
-      roomResources.forEach(r=>{
-        const k=key(currentDay,s.id,r.id),booked=reservations[k]||[],wl=waitlists[k]||[];
-        const count=booked.length,cap=r.capacity,isMe=isBookedByMe(k),inNS=noShowTimers[k]!==undefined;
-        const cat=categoryLabel(r.category);
-        if(count>0){
-          booked.forEach(bId=>{
-            const rowIsMe=bId===currentStudent?.id;
-            html+=`<div class="wheel-slot ${rowIsMe?'mine':'booked'}">
-              <div><div class="student-name">${esc(nameFor(bId))}</div>
-              <div class="muted">${esc(r.label)} <span class="category-badge">${esc(cat)}</span>${cap>1?`<div class="seat-count">${count} of ${cap} seats</div>`:''}</div></div>
-              <div style="display:flex;gap:4px;align-items:center">
-                ${inNS&&rowIsMe?`<span class="countdown" id="cd-${k}">releasing soon</span>`:''}
-                ${rowIsMe?`<button class="btn btn-sm btn-danger" onclick="cancelRes('${esc(currentDay)}','${esc(s.id)}','${esc(r.id)}')">cancel</button>`:''}
-              </div>
-            </div>`;
-          });
-        } else {
-          let action='';
-          if(bookable&&currentStudent){
-            action=studentHasBookingToday(currentDay)
-              ?'<span class="muted" style="font-size:11px">1/day limit</span>'
-              :`<button class="btn btn-sm btn-primary" onclick="bookSlot('${esc(currentDay)}','${esc(s.id)}','${esc(r.id)}')">reserve</button>`;
-          }
-          html+=`<div class="wheel-slot empty"><div><div class="student-name" style="color:var(--ink3)">available</div>
-            <div class="muted">${esc(r.label)} <span class="category-badge">${esc(cat)}</span>${cap>1?`<div class="seat-count">0 of ${cap} seats</div>`:''}</div></div>${action}</div>`;
+    sortedResources().forEach(r=>{
+      const k=key(currentDay,s.id,r.id),booked=reservations[k]||[],wl=waitlists[k]||[];
+      const count=booked.length,cap=r.capacity,isMe=isBookedByMe(k),inNS=noShowTimers[k]!==undefined;
+      const full=count>=cap;
+      const showBooked=full&&!isMe;
+      const showEmpty=!isMe&&!showBooked;
+      if(isMe){
+        html+=`<div class="wheel-slot mine">
+          <div><div class="student-name">${esc(nameFor(currentStudent.id))}</div><div class="muted">${esc(r.label)}</div></div>
+          <div style="display:flex;gap:4px;align-items:center">
+            ${inNS?`<span class="countdown" id="cd-${k}">releasing soon</span>`:''}
+            <button class="btn btn-sm btn-danger" onclick="cancelRes('${esc(currentDay)}','${esc(s.id)}','${esc(r.id)}')">cancel</button>
+          </div>
+        </div>`;
+      } else if(showBooked){
+        html+=`<div class="wheel-slot booked">
+          <div><div class="student-name">${esc(nameFor(booked[0]))}</div><div class="muted">${esc(r.label)}</div></div>
+          <div style="display:flex;gap:4px;align-items:center">
+            ${inNS?`<span class="countdown" id="cd-${k}">releasing soon</span>`:''}
+          </div>
+        </div>`;
+      } else if(showEmpty){
+        let action='';
+        if(bookable&&currentStudent){
+          action=studentHasBookingToday(currentDay)
+            ?'<span class="muted" style="font-size:11px">1/day limit</span>'
+            :`<button class="btn btn-sm btn-primary" onclick="bookSlot('${esc(currentDay)}','${esc(s.id)}','${esc(r.id)}')">reserve</button>`;
         }
-        if(count>0&&count<cap&&bookable&&currentStudent&&!studentHasBookingToday(currentDay)&&!isMe){
-          html+=`<div style="font-size:11.5px;color:var(--ink3);padding:2px 0 4px 4px">
-            ${count} of ${cap} seats · <button class="btn btn-sm" style="margin-left:4px;font-size:11px;padding:3px 8px" onclick="bookSlot('${esc(currentDay)}','${esc(s.id)}','${esc(r.id)}')">reserve</button>
-          </div>`;
-        }
-        const pos=wl.indexOf(currentStudent?.id);
-        const slotFull=isSlotFull(k,cap);
-        const canJoin=currentStudent&&bookable&&!studentHasBookingToday(currentDay)&&pos===-1&&slotFull;
-        if(wl.length>0||canJoin){
-          html+=`<div style="font-size:11.5px;color:var(--ink3);padding:4px 0 6px 4px">
-            <i class="ti ti-list" aria-hidden="true"></i> ${wl.length>0?`waitlist: ${wl.length}`:'slot full'}${pos>-1?` <strong>· you are #${pos+1}</strong>`:''}
-            ${canJoin?`<button class="btn btn-sm" style="margin-left:8px;font-size:11px;padding:3px 8px" onclick="joinWaitlist('${esc(currentDay)}','${esc(s.id)}','${esc(r.id)}')">join waitlist</button>`:''}
-          </div>`;
-        }
-      });
+        html+=`<div class="wheel-slot empty"><div><div class="student-name" style="color:var(--ink3)">available</div><div class="muted">${esc(r.label)}</div></div>${action}</div>`;
+      }
+      const pos=wl.indexOf(currentStudent?.id);
+      const canJoin=currentStudent&&bookable&&!studentHasBookingToday(currentDay)&&pos===-1&&full;
+      if(wl.length>0||canJoin){
+        html+=`<div style="font-size:11.5px;color:var(--ink3);padding:4px 0 6px 4px">
+          <i class="ti ti-list" aria-hidden="true"></i> ${wl.length>0?`waitlist: ${wl.length}`:'slot full'}${pos>-1?` <strong>· you are #${pos+1}</strong>`:''}
+          ${canJoin?`<button class="btn btn-sm" style="margin-left:8px;font-size:11px;padding:3px 8px" onclick="joinWaitlist('${esc(currentDay)}','${esc(s.id)}','${esc(r.id)}')">join waitlist</button>`:''}
+        </div>`;
+      }
     });
     html+='</div>';
   });
