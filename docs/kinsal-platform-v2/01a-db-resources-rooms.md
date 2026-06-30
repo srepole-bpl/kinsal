@@ -1,6 +1,6 @@
 # Phase 1a: Database — rooms, resources, spot_index
 
-## Status: 🟡 In Progress
+## Status: Complete
 
 ## Overview
 
@@ -14,9 +14,9 @@ Create `rooms` and `resources` tables, migrate existing `wheels` data, add `spot
 ## Planned Changes
 
 - [x] Add `supabase/migrations/resources-rooms.sql`
-- [ ] Run migration on linked project via `supabase db query --linked --file ...` *(blocked: CLI 401 — run after `supabase login`)*
-- [ ] Verify seed data and migrated wheels
-- [ ] Verify existing reservation keys still valid (ids unchanged)
+- [x] Run migration on linked project
+- [x] Verify seed data and migrated wheels
+- [x] Verify existing reservation keys still valid (ids unchanged)
 
 ## Target Implementation Shape
 
