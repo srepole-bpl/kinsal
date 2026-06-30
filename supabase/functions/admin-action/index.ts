@@ -13,6 +13,12 @@ import {
   parseSchedulePayload,
 } from "../_shared/schedule.ts";
 import {
+  loadClosedDays,
+  loadSlotBlocks,
+  parseBlockPayload,
+  parseClosedDaysPayload,
+} from "../_shared/blocks.ts";
+import {
   maxConcurrentBookingsForResource,
   parseResourcePayload,
   parseRoomPayload,
@@ -436,6 +442,58 @@ Deno.serve(async (req) => {
     }
 
     return json({ success: true, ...schedule });
+  }
+
+  // ── SLOT BLOCKS ────────────────────────────────────────────────────────────
+  if (action === "getBlocks") {
+    const blocks = await loadSlotBlocks(db);
+    return json({ success: true, blocks });
+  }
+
+  if (action === "saveBlocks") {
+    let incoming: unknown;
+    try {
+      incoming = JSON.parse(String(body.blocks || "[]"));
+    } catch {
+      return json({ success: false, error: "invalid blocks data" }, 400);
+    }
+    const parsed = parseBlockPayload(incoming);
+    if (!parsed.ok) return json({ success: false, error: parsed.error }, 400);
+
+    await db.from("slot_blocks").delete().neq("id", -1);
+    for (const block of parsed.blocks) {
+      const { error } = await db.from("slot_blocks").insert(block);
+      if (error) return json({ success: false, error: "could not save blocks" }, 500);
+    }
+
+    const blocks = await loadSlotBlocks(db);
+    return json({ success: true, blocks });
+  }
+
+  // ── CLOSED DAYS ──────────────────────────────────────────────────────────────
+  if (action === "getClosedDays") {
+    const closedDays = await loadClosedDays(db);
+    return json({ success: true, closedDays });
+  }
+
+  if (action === "saveClosedDays") {
+    let incoming: unknown;
+    try {
+      incoming = JSON.parse(String(body.closedDays || "[]"));
+    } catch {
+      return json({ success: false, error: "invalid closed days data" }, 400);
+    }
+    const parsed = parseClosedDaysPayload(incoming);
+    if (!parsed.ok) return json({ success: false, error: parsed.error }, 400);
+
+    await db.from("closed_days").delete().neq("date", "1900-01-01");
+    for (const day of parsed.days) {
+      const { error } = await db.from("closed_days").insert(day);
+      if (error) return json({ success: false, error: "could not save closed days" }, 500);
+    }
+
+    const closedDays = await loadClosedDays(db);
+    return json({ success: true, closedDays });
   }
 
   return json({ success: false, error: "unknown action" }, 400);

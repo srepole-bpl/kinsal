@@ -23,7 +23,7 @@
 | 4a. Student UX | [04a-student-ux.md](./04a-student-ux.md) | ✅ Complete | `9866e1f` |
 | 4b. Emails + reminders | [04b-emails-reminders.md](./04b-emails-reminders.md) | ✅ Complete | `9866e1f` |
 | **5 — Instructor ops** | [05-phase5-overview.md](./05-phase5-overview.md) | Pending | — |
-| 5a. Blocks + closed days | [05a-blocks-closed-days.md](./05a-blocks-closed-days.md) | Pending | — |
+| 5a. Blocks + closed days | [05a-blocks-closed-days.md](./05a-blocks-closed-days.md) | ✅ Complete | pending |
 | 5b. Roster CSV + limits | [05b-roster-limits.md](./05b-roster-limits.md) | Pending | — |
 | 5c. Audit + PIN | [05c-audit-pin.md](./05c-audit-pin.md) | Pending | — |
 | 6. Communications | [06-communications.md](./06-communications.md) | Pending | — |
@@ -38,7 +38,7 @@
 
 ## Current Context
 
-- Phase 4 **complete and deployed**. Next: **Phase 5a** — blocks + closed days ([05a-blocks-closed-days.md](./05a-blocks-closed-days.md)). See [implementation-plan.md](./implementation-plan.md) for architecture decisions.
+- Phase 5a **complete and deployed**. Next: **Phase 5b** — roster CSV + limits ([05b-roster-limits.md](./05b-roster-limits.md)).
 
 ## Architectural Decisions Made
 

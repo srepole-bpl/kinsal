@@ -3,6 +3,7 @@
 // server-side: valid day/slot/resource, real student, booking window (studio
 // timezone), one-reservation-per-day, capacity-aware slot claim. Cancel verifies
 // ownership before deleting and then promotes the waitlist.
+import { getActiveBlock, isClosedForWeekday } from "../_shared/blocks.ts";
 import { json, preflight } from "../_shared/cors.ts";
 import { serviceClient } from "../_shared/db.ts";
 import { sendBookingConfirmation } from "../_shared/email.ts";
@@ -77,6 +78,13 @@ Deno.serve(async (req) => {
 
   if (action === "book") {
     const schedule = await loadSchedule(db);
+    if (await isClosedForWeekday(db, day, schedule.timezone)) {
+      return json({ success: false, error: "studio closed that day" }, 403);
+    }
+    const block = await getActiveBlock(db, k);
+    if (block) {
+      return json({ success: false, error: block.reason || "slot blocked" }, 403);
+    }
     if (!isBookingOpen(schedule, day, slotId)) {
       return json({ success: false, error: "booking window is not open" }, 403);
     }
@@ -138,6 +146,14 @@ Deno.serve(async (req) => {
   }
 
   if (action === "join_waitlist") {
+    const schedule = await loadSchedule(db);
+    if (await isClosedForWeekday(db, day, schedule.timezone)) {
+      return json({ success: false, error: "studio closed that day" }, 403);
+    }
+    const block = await getActiveBlock(db, k);
+    if (block) {
+      return json({ success: false, error: block.reason || "slot blocked" }, 403);
+    }
     const resource = await getResource(db, resourceId);
     if (!resource) return json({ success: false, error: "unknown resource" }, 400);
 
