@@ -18,7 +18,7 @@
 | 1c. Student grid UI | [01c-ui-student-grid.md](./01c-ui-student-grid.md) | Complete | `71da723` |
 | 1d. Instructor Settings UI | [01d-ui-instructor-settings.md](./01d-ui-instructor-settings.md) | Complete | `2c6b7f6` |
 | 2. Editable schedule | [02-schedule.md](./02-schedule.md) | Complete | `4739450` |
-| 3. Student auth | [03-student-auth.md](./03-student-auth.md) | ✅ Complete | 48f4461 |
+| 3. Student auth | [03-student-auth.md](./03-student-auth.md) | Cancelled | reverted |
 | **4 — Student experience** | [04-phase4-overview.md](./04-phase4-overview.md) | Pending | — |
 | 4a. Student UX | [04a-student-ux.md](./04a-student-ux.md) | Pending | — |
 | 4b. Emails + reminders | [04b-emails-reminders.md](./04b-emails-reminders.md) | Pending | — |

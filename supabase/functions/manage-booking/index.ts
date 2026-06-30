@@ -3,7 +3,6 @@
 // server-side: valid day/slot/resource, real student, booking window (studio
 // timezone), one-reservation-per-day, capacity-aware slot claim. Cancel verifies
 // ownership before deleting and then promotes the waitlist.
-import { getUserFromRequest, resolveStudent } from "../_shared/auth.ts";
 import { json, preflight } from "../_shared/cors.ts";
 import { serviceClient } from "../_shared/db.ts";
 import { getResource, loadResourceIds, nextFreeSpot } from "../_shared/resources.ts";
@@ -27,14 +26,6 @@ async function validSlot(
   return resourceIds.has(resourceId);
 }
 
-async function requireStudent(req: Request, db: ReturnType<typeof serviceClient>) {
-  const user = await getUserFromRequest(req);
-  if (!user) return { error: json({ success: false, error: "sign in required" }, 401) };
-  const student = await resolveStudent(db, user);
-  if (!student) return { error: json({ success: false, error: "email not on roster" }, 403) };
-  return { student };
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return preflight();
   if (req.method !== "POST") return json({ success: false, error: "method not allowed" }, 405);
@@ -49,39 +40,39 @@ Deno.serve(async (req) => {
   const db = serviceClient();
   const action = String(body.action || "");
 
-  // Roster check before sending magic link (no student id returned)
-  if (action === "check_email" || action === "lookup") {
+  if (action === "lookup") {
     const email = String(body.email || "").trim().toLowerCase();
     if (!isValidEmail(email)) return json({ success: false, error: "invalid email" }, 400);
     const { data: stu } = await db
       .from("students")
-      .select("id")
+      .select("id, name, email")
       .eq("email", email)
       .maybeSingle();
-    return json({ success: true, found: !!stu });
-  }
-
-  if (action === "me") {
-    const auth = await requireStudent(req, db);
-    if (auth.error) return auth.error;
+    if (!stu) return json({ success: true, found: false });
     return json({
       success: true,
-      student: { id: auth.student.id, name: auth.student.name, email: auth.student.email },
+      found: true,
+      student: { id: stu.id, name: stu.name, email: stu.email },
     });
   }
 
-  const auth = await requireStudent(req, db);
-  if (auth.error) return auth.error;
-  const studentId = auth.student.id;
-
+  const studentId = String(body.studentId || "");
   const day = String(body.day || "");
   const slotId = String(body.slotId || "");
   const resourceId = String(body.resourceId || body.wheel || "");
   const k = `${day}|${slotId}|${resourceId}`;
 
+  if (!studentId) return json({ success: false, error: "missing student" }, 400);
   if (!(await validSlot(db, day, slotId, resourceId))) {
     return json({ success: false, error: "invalid slot" }, 400);
   }
+
+  const { data: stu } = await db
+    .from("students")
+    .select("id, name")
+    .eq("id", studentId)
+    .maybeSingle();
+  if (!stu) return json({ success: false, error: "unknown student" }, 400);
 
   if (action === "book") {
     const schedule = await loadSchedule(db);
