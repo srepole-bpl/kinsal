@@ -13,6 +13,14 @@ import {
   parseSchedulePayload,
 } from "../_shared/schedule.ts";
 import {
+  csvEscape,
+  incrementNoShowCount,
+  isBookingBlocked,
+  loadStudioLimits,
+  parseCsvLine,
+  parseLimitsPayload,
+} from "../_shared/limits.ts";
+import {
   loadClosedDays,
   loadSlotBlocks,
   parseBlockPayload,
@@ -71,7 +79,7 @@ Deno.serve(async (req) => {
   if (action === "roster") {
     const { data: studs } = await db
       .from("students")
-      .select("id, name, email")
+      .select("id, name, email, booking_blocked_until, no_show_count")
       .order("name", { ascending: true });
     const { data: allRes } = await db.from("reservations").select("student_id");
     const { data: allNs } = await db
@@ -88,17 +96,141 @@ Deno.serve(async (req) => {
       (nsBy[n.student_id] = nsBy[n.student_id] || []).push(n.logged_at);
     });
 
-    const roster = (studs || []).map((s: { id: string; name: string; email: string }) => ({
+    const roster = (studs || []).map((s: {
+      id: string;
+      name: string;
+      email: string;
+      booking_blocked_until: string | null;
+      no_show_count: number;
+    }) => ({
       id: s.id,
       name: s.name,
       email: s.email,
       weeklyHours: (resCount[s.id] || 0) * 4,
-      noShowCount: (nsBy[s.id] || []).length,
+      noShowCount: s.no_show_count ?? 0,
+      bookingBlocked: isBookingBlocked(s.booking_blocked_until),
       lastVisit: nsBy[s.id]?.length
         ? new Date(nsBy[s.id][0]).toLocaleDateString("en-US", { month: "short", day: "numeric" })
         : "no history yet",
     }));
     return json({ success: true, roster });
+  }
+
+  // ── ROSTER CSV ──────────────────────────────────────────────────────────────
+  if (action === "exportRoster") {
+    const { data: studs } = await db
+      .from("students")
+      .select("name, email")
+      .order("name", { ascending: true });
+    const lines = ["name,email", ...(studs || []).map((s: { name: string; email: string }) =>
+      `${csvEscape(s.name)},${csvEscape(s.email)}`)];
+    return json({ success: true, csv: lines.join("\n") });
+  }
+
+  if (action === "importRoster") {
+    const csv = String(body.csv || "");
+    if (!csv.trim()) return json({ success: false, error: "empty csv" }, 400);
+
+    const lines = csv.trim().split(/\r?\n/).filter((l) => l.trim());
+    let start = 0;
+    const first = parseCsvLine(lines[0]);
+    if (first.length >= 2 && /^name$/i.test(first[0]) && /^email$/i.test(first[1])) {
+      start = 1;
+    }
+
+    const { count: existingCount } = await db
+      .from("students")
+      .select("id", { count: "exact", head: true });
+    let added = 0;
+    const skipped: string[] = [];
+
+    for (let i = start; i < lines.length; i++) {
+      const cols = parseCsvLine(lines[i]);
+      if (cols.length < 2) {
+        skipped.push(`row ${i + 1}: missing columns`);
+        continue;
+      }
+      const name = sanitizeName(cols[0]);
+      const email = String(cols[1]).trim().toLowerCase();
+      if (!isValidName(name)) {
+        skipped.push(`row ${i + 1}: invalid name`);
+        continue;
+      }
+      if (!isValidEmail(email)) {
+        skipped.push(`row ${i + 1}: invalid email`);
+        continue;
+      }
+      const { data: dupe } = await db.from("students").select("id").eq("email", email).maybeSingle();
+      if (dupe) {
+        skipped.push(`row ${i + 1}: ${email} already registered`);
+        continue;
+      }
+      if ((existingCount ?? 0) + added >= MAX_STUDENTS) {
+        skipped.push(`row ${i + 1}: roster limit reached`);
+        continue;
+      }
+      const id = "s" + Date.now() + i;
+      const { error } = await db.from("students").insert({ id, name, email });
+      if (error) {
+        skipped.push(`row ${i + 1}: could not add`);
+        continue;
+      }
+      added++;
+    }
+
+    return json({ success: true, added, skipped });
+  }
+
+  if (action === "exportBookings") {
+    const { data: resRows } = await db.from("reservations").select("key, student_id").order("key");
+    const { data: studs } = await db.from("students").select("id, name, email");
+    const { data: resList } = await db.from("resources").select("id, label");
+    const studMap: Record<string, { name: string; email: string }> = {};
+    (studs || []).forEach((s: { id: string; name: string; email: string }) => {
+      studMap[s.id] = { name: s.name, email: s.email };
+    });
+    const resMap: Record<string, string> = {};
+    (resList || []).forEach((r: { id: string; label: string }) => {
+      resMap[r.id] = r.label;
+    });
+
+    const lines = ["day,slot,resource,resource_label,student_name,student_email"];
+    for (const row of resRows || []) {
+      const [day, slot, resourceId] = String(row.key).split("|");
+      const stu = studMap[row.student_id];
+      lines.push([
+        csvEscape(day),
+        csvEscape(slot),
+        csvEscape(resourceId),
+        csvEscape(resMap[resourceId] || resourceId),
+        csvEscape(stu?.name || ""),
+        csvEscape(stu?.email || ""),
+      ].join(","));
+    }
+    return json({ success: true, csv: lines.join("\n") });
+  }
+
+  if (action === "clearNoShowBlock") {
+    const id = String(body.id || body.studentId || "");
+    if (!id) return json({ success: false, error: "missing id" }, 400);
+    await db.from("students").update({ booking_blocked_until: null }).eq("id", id);
+    return json({ success: true });
+  }
+
+  if (action === "getLimits") {
+    const limits = await loadStudioLimits(db);
+    return json({ success: true, ...limits });
+  }
+
+  if (action === "saveLimits") {
+    const parsed = parseLimitsPayload(body.maxBookingsPerWeek, body.noShowThreshold);
+    if (!parsed.ok) return json({ success: false, error: parsed.error }, 400);
+    const { error } = await db.from("studio_settings").update({
+      max_bookings_per_week: parsed.limits.max_bookings_per_week,
+      no_show_threshold: parsed.limits.no_show_threshold,
+    }).eq("id", 1);
+    if (error) return json({ success: false, error: "could not save limits" }, 500);
+    return json({ success: true, ...parsed.limits });
   }
 
   // ── ADD STUDENT ─────────────────────────────────────────────────────────────

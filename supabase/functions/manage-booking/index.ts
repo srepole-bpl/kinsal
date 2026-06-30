@@ -3,6 +3,11 @@
 // server-side: valid day/slot/resource, real student, booking window (studio
 // timezone), one-reservation-per-day, capacity-aware slot claim. Cancel verifies
 // ownership before deleting and then promotes the waitlist.
+import {
+  countStudentReservations,
+  isBookingBlocked,
+  loadStudioLimits,
+} from "../_shared/limits.ts";
 import { getActiveBlock, isClosedForWeekday } from "../_shared/blocks.ts";
 import { json, preflight } from "../_shared/cors.ts";
 import { serviceClient } from "../_shared/db.ts";
@@ -71,13 +76,21 @@ Deno.serve(async (req) => {
 
   const { data: stu } = await db
     .from("students")
-    .select("id, name, email")
+    .select("id, name, email, booking_blocked_until")
     .eq("id", studentId)
     .maybeSingle();
   if (!stu) return json({ success: false, error: "unknown student" }, 400);
 
   if (action === "book") {
     const schedule = await loadSchedule(db);
+    if (isBookingBlocked(stu.booking_blocked_until)) {
+      return json({ success: false, error: "booking blocked — contact your instructor" }, 403);
+    }
+    const limits = await loadStudioLimits(db);
+    const resCount = await countStudentReservations(db, studentId);
+    if (resCount >= limits.max_bookings_per_week) {
+      return json({ success: false, error: "weekly booking limit reached" }, 403);
+    }
     if (await isClosedForWeekday(db, day, schedule.timezone)) {
       return json({ success: false, error: "studio closed that day" }, 403);
     }

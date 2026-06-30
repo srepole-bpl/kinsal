@@ -10,6 +10,7 @@
 // reach it. Without the secret it refuses to run.
 import { json } from "../_shared/cors.ts";
 import { serviceClient } from "../_shared/db.ts";
+import { incrementNoShowCount, loadStudioLimits } from "../_shared/limits.ts";
 import { promoteAndNotify } from "../_shared/waitlist.ts";
 
 const RELEASE_AFTER_MIN = 30;
@@ -24,6 +25,7 @@ Deno.serve(async (req) => {
   }
 
   const db = serviceClient();
+  const limits = await loadStudioLimits(db);
   const cutoff = new Date(Date.now() - RELEASE_AFTER_MIN * 60 * 1000).toISOString();
 
   const { data: due } = await db
@@ -41,6 +43,7 @@ Deno.serve(async (req) => {
       .eq("key", ns.key)
       .eq("student_id", ns.student_id)
       .eq("logged_at", ns.logged_at);
+    await incrementNoShowCount(db, ns.student_id, limits);
     await promoteAndNotify(db, ns.key);
     released++;
   }

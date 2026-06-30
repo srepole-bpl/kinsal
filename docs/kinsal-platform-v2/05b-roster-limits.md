@@ -1,71 +1,37 @@
 # Phase 5b: Roster CSV + booking limits + no-show block
 
-## Status: Pending
+## Status: ✅ Complete
 
 ## Overview
 
 CSV import/export for roster and reservations, configurable weekly booking cap per student, and automatic booking block after repeated no-shows (cleared by instructor). Integrates with existing `release-noshows` cron.
 
-## Prerequisites
-
-- Phase 5a complete (recommended)
-- Existing `students` table and `release-noshows` function ✅
-
 ## Planned Changes
 
-- [ ] Add columns: `students.booking_blocked_until`, `students.no_show_count`, `studio_settings.max_bookings_per_week`, `studio_settings.no_show_threshold`
-- [ ] Extend `admin-action`: `importRoster` (CSV parse), `exportRoster`, `exportBookings`
-- [ ] Extend `manage-booking`: enforce weekly cap and `booking_blocked_until` on book
-- [ ] Update `release-noshows`: increment no-show count; set block when threshold reached
-- [ ] Instructor UI: roster import (file upload), export buttons, clear block toggle per student
-- [ ] Settings: max bookings/week and no-show threshold inputs
-
-## Target Implementation Shape
-
-**Weekly cap check**
-
-```typescript
-const weekStart = startOfWeek(bookingDate, { timezone });
-const count = await countReservationsForStudentInWeek(db, studentId, weekStart);
-if (count >= settings.max_bookings_per_week) return json({ error: "weekly limit reached" }, 403);
-```
-
-**CSV import**
-
-```typescript
-// Columns: name, email (header row optional)
-// Duplicate email → skip or error per row; sanitize email lowercase
-// admin-action importRoster: { token, csv: string }
-```
-
-**No-show block**
-
-```typescript
-// release-noshows marks absent students
-// if no_show_count >= threshold → booking_blocked_until = far future or flag
-// admin clearNoShowBlock: { token, studentId }
-```
-
-## Files Touched
-
-- `supabase/migrations/roster-limits.sql` (new)
-- `supabase/functions/admin-action/index.ts`
-- `supabase/functions/manage-booking/index.ts`
-- `supabase/functions/release-noshows/index.ts`
-- `index.html`
-
-## Verification Checklist
-
-- [ ] CSV import adds 3 students; duplicate email rejected with message
-- [ ] Export roster downloads valid CSV with name, email
-- [ ] Export bookings includes day, slot, resource, student name
-- [ ] Student at weekly cap cannot book additional slot same week
-- [ ] After N no-shows, student blocked until instructor clears
-- [ ] `release-noshows` cron still runs without error
+- [x] Add columns: `students.booking_blocked_until`, `students.no_show_count`, `studio_settings.max_bookings_per_week`, `studio_settings.no_show_threshold`
+- [x] Extend `admin-action`: `importRoster` (CSV parse), `exportRoster`, `exportBookings`
+- [x] Extend `manage-booking`: enforce weekly cap and `booking_blocked_until` on book
+- [x] Update `release-noshows`: increment no-show count; set block when threshold reached
+- [x] Instructor UI: roster import (file upload), export buttons, clear block toggle per student
+- [x] Settings: max bookings/week and no-show threshold inputs
 
 ## Implementation Notes
 
-<!-- Filled during implementation -->
+**Weekly cap:** Counts active reservations per student (scoped by Monday weekly reset). Default max: 4.
+
+**No-show block:** `release-noshows` increments `students.no_show_count` when a no-show is released. At threshold (default 3), sets `booking_blocked_until` to far future. Instructor clears via **Clear block** on roster row.
+
+**CSV import:** `name,email` columns; header row optional; duplicate emails skipped with message.
+
+**Settings → booking limits:** max bookings/week (1–14), no-show threshold (1–20).
+
+**Deploy:**
+```bash
+supabase db query --linked --file supabase/migrations/roster-limits.sql
+supabase functions deploy manage-booking --use-api
+supabase functions deploy admin-action --use-api
+supabase functions deploy release-noshows --no-verify-jwt --use-api
+```
 
 ## Navigation
 

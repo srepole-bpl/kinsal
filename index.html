@@ -265,7 +265,8 @@ let draftScheduleDays=[], draftScheduleSlots=[], draftTimezone='America/New_York
 let students=[], reservations={}, waitlists={};
 let rooms=[], resources=[], resourceMap={}, resourcesByRoom={};
 let slotBlocks=[], closedDays=[];
-let draftSlotBlocks=[], draftClosedDays=[];
+let maxBookingsPerWeek=4, noShowThreshold=3;
+let draftMaxBookingsPerWeek=4, draftNoShowThreshold=3;
 let roster=[], rosterMap={};
 let noShowTimers={}, countdownIntervals={};
 let currentStudent=null, currentDay=SCHEDULE_FALLBACK_DAYS[0], pendingAction=null;
@@ -554,12 +555,21 @@ async function loadSchedule(){
   const dayList=getDays();
   if(!dayList.includes(currentDay)) currentDay=dayList[0];
 }
+async function loadStudioLimits(){
+  const {data,error}=await db.from('studio_settings').select('max_bookings_per_week,no_show_threshold').eq('id',1).maybeSingle();
+  if(error){ logEvent('db-error','loadStudioLimits: '+error.message); return; }
+  maxBookingsPerWeek=data?.max_bookings_per_week??4;
+  noShowThreshold=data?.no_show_threshold??3;
+  draftMaxBookingsPerWeek=maxBookingsPerWeek;
+  draftNoShowThreshold=noShowThreshold;
+}
 async function loadCatalog(){
   await loadRooms();
   await loadResources();
   await loadSchedule();
   await loadSlotBlocks();
   await loadClosedDays();
+  await loadStudioLimits();
 }
 async function loadSlotBlocks(){
   const {data,error}=await db.from('slot_blocks').select('*').order('id');
@@ -722,6 +732,8 @@ async function bookSlot(day,slotId,resourceId){
   if(block){ showRateBanner(block.reason||'slot blocked',true); return; }
   if(!canBookClientSide(day,slotId)){ showRateBanner('booking window not open yet',true); return; }
   if(studentHasBookingToday(day)){ showRateBanner('you already have a reservation today',true); return; }
+  const myCount=getMyBookings().filter(b=>b.type==='booking').length;
+  if(myCount>=maxBookingsPerWeek){ showRateBanner('weekly booking limit reached',true); return; }
   const res=resourceMap[resourceId];
   if(isSlotFull(k,res?.capacity||1)){ showRateBanner('that slot was just taken',true); return; }
   const sl=getSlots().find(s=>s.id===slotId);
@@ -989,15 +1001,26 @@ async function renderDash(){
   restartCountdownDisplays();
 
   // roster (names, emails, stats come from the server roster call)
-  let rosterHtml='<div class="card">';
+  let rosterHtml=`<div class="card">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <label class="btn btn-sm" style="cursor:pointer"><i class="ti ti-upload"></i> import csv
+        <input type="file" id="roster-import-file" accept=".csv,text/csv" style="display:none" onchange="importRosterCsv(this)">
+      </label>
+      <button class="btn btn-sm" onclick="exportRosterCsv()"><i class="ti ti-download"></i> export roster</button>
+      <button class="btn btn-sm" onclick="exportBookingsCsv()"><i class="ti ti-download"></i> export bookings</button>
+    </div>
+    <div id="roster-import-result" class="muted" style="font-size:12px;margin-bottom:8px;display:none"></div>`;
   roster.forEach(r=>{
     rosterHtml+=`<div class="roster-row">
       <div style="display:flex;align-items:center;gap:10px">
         <div class="avatar">${esc(r.name.split(' ').map(n=>n[0]).join(''))}</div>
-        <div><div class="student-name">${esc(r.name)}</div>
+        <div><div class="student-name">${esc(r.name)}${r.bookingBlocked?' <span style="color:var(--red);font-size:11px">· blocked</span>':''}</div>
         <div class="muted">${esc(r.email||'')} · ${r.weeklyHours}h this week · ${r.noShowCount} no-shows · last: ${esc(r.lastVisit)}</div></div>
       </div>
-      <button class="btn btn-sm btn-danger" onclick="removeStudent('${esc(r.id)}')">remove</button>
+      <div style="display:flex;gap:6px">
+        ${r.bookingBlocked?`<button class="btn btn-sm" onclick="clearNoShowBlock('${esc(r.id)}')">clear block</button>`:''}
+        <button class="btn btn-sm btn-danger" onclick="removeStudent('${esc(r.id)}')">remove</button>
+      </div>
     </div>`;
   });
   rosterHtml+=`<div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
@@ -1067,6 +1090,15 @@ async function renderDash(){
       <button class="btn btn-sm" onclick="addClosedDayRow()">add closed day</button>
       <button class="btn btn-sm btn-primary" onclick="saveClosedDays()">save closed days</button>
     </div>
+    <div class="section-label" style="margin-top:16px">booking limits</div>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">max active reservations per student (resets weekly). students blocked after repeated no-shows until you clear them.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div><label style="font-size:12px;color:var(--ink3)">max bookings / week</label>
+      <input type="number" id="limit-max-bookings" min="1" max="14" value="${draftMaxBookingsPerWeek}" style="width:100%;margin-top:4px"></div>
+      <div><label style="font-size:12px;color:var(--ink3)">no-show block threshold</label>
+      <input type="number" id="limit-no-show-threshold" min="1" max="20" value="${draftNoShowThreshold}" style="width:100%;margin-top:4px"></div>
+    </div>
+    <button class="btn btn-sm btn-primary" onclick="saveLimits()">save limits</button>
     <div class="section-label" style="margin-top:16px">booking window</div>
     <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">opens 2 hours before each slot starts. closes 1 hour before the slot ends. enforced server-side.</p>
     <div class="section-label">no-show window</div>
@@ -1401,6 +1433,67 @@ async function saveClosedDays(){
   showToast('closed days saved');
   renderClosedDaysList(); renderDash(); renderSlots();
 }
+function downloadCsv(filename,csv){
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+async function exportRosterCsv(){
+  if(!requireSession()) return;
+  const data=await adminCall('exportRoster');
+  if(!data?.success||!data.csv){ showToast(data?.error||'export failed'); return; }
+  downloadCsv('kinsal-roster.csv',data.csv);
+  showToast('roster exported');
+}
+async function exportBookingsCsv(){
+  if(!requireSession()) return;
+  const data=await adminCall('exportBookings');
+  if(!data?.success||!data.csv){ showToast(data?.error||'export failed'); return; }
+  downloadCsv('kinsal-bookings.csv',data.csv);
+  showToast('bookings exported');
+}
+async function importRosterCsv(input){
+  if(!requireSession()) return;
+  const file=input?.files?.[0];
+  if(!file) return;
+  const csv=await file.text();
+  input.value='';
+  const data=await adminCall('importRoster',{csv});
+  const el=document.getElementById('roster-import-result');
+  if(!data?.success){ showToast(data?.error||'import failed'); return; }
+  const skipped=(data.skipped||[]);
+  if(el){
+    el.style.display='block';
+    el.textContent=`added ${data.added||0} student(s)${skipped.length?`; skipped: ${skipped.slice(0,3).join('; ')}${skipped.length>3?'…':''}`:''}`;
+  }
+  logEvent('roster',`CSV import: ${data.added||0} added`);
+  showToast(`imported ${data.added||0} student(s)`);
+  await loadStudents(); await loadRoster(); renderDash();
+}
+async function clearNoShowBlock(id){
+  if(!requireSession()) return;
+  const data=await adminCall('clearNoShowBlock',{id});
+  if(!data?.success){ showToast(data?.error||'could not clear block'); return; }
+  logEvent('roster','Cleared booking block for '+id);
+  showToast('block cleared');
+  await loadRoster(); renderDash();
+}
+async function saveLimits(){
+  if(!requireSession()) return;
+  const maxBookingsPerWeekVal=parseInt(document.getElementById('limit-max-bookings')?.value||'4',10);
+  const noShowThresholdVal=parseInt(document.getElementById('limit-no-show-threshold')?.value||'3',10);
+  const data=await adminCall('saveLimits',{maxBookingsPerWeek:maxBookingsPerWeekVal,noShowThreshold:noShowThresholdVal});
+  if(!data?.success){ showToast(data?.error||'could not save limits'); return; }
+  maxBookingsPerWeek=data.max_bookings_per_week??maxBookingsPerWeekVal;
+  noShowThreshold=data.no_show_threshold??noShowThresholdVal;
+  draftMaxBookingsPerWeek=maxBookingsPerWeek;
+  draftNoShowThreshold=noShowThreshold;
+  logEvent('settings','Booking limits updated');
+  showToast('limits saved');
+}
 async function generatePinHash(){
   const val=document.getElementById('new-pin').value.trim();
   if(!/^\d{4,6}$/.test(val)){ showToast('pin must be 4–6 digits'); return; }
@@ -1524,6 +1617,7 @@ db.channel('reservations-changes')
   })
   .on('postgres_changes',{event:'*',schema:'public',table:'studio_settings'}, async ()=>{
     await loadSchedule();
+    await loadStudioLimits();
     renderSlots();
   })
   .on('postgres_changes',{event:'*',schema:'public',table:'slot_blocks'}, async ()=>{
