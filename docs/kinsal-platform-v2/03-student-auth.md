@@ -1,6 +1,6 @@
 # Phase 3: Student authentication (magic link)
 
-## Status: Pending
+## Status: ✅ Complete
 
 ## Overview
 
@@ -13,14 +13,14 @@ Replace client-trusted `studentId` with Supabase Auth magic links. Link roster r
 
 ## Planned Changes
 
-- [ ] Add `students.auth_user_id uuid references auth.users(id)` migration
-- [ ] Enable Supabase Auth in project; configure redirect URL to GitHub Pages embed
-- [ ] Add `_shared/auth.ts` (verify JWT, resolve student from `auth_user_id` or email claim)
-- [ ] Update `manage-booking`: require Authorization header for book/cancel/waitlist; ignore body `studentId`
-- [ ] Update `index.html`: login panel (email → magic link); session persistence; logout
-- [ ] Link-on-first-login: match JWT email to `students.email`; set `auth_user_id`
-- [ ] Handle roster email not yet in Auth (invite / "contact instructor" message)
-- [ ] Update RLS if any student-facing reads need auth (optional: keep anon read for grid)
+- [x] Add `students.auth_user_id uuid references auth.users(id)` migration
+- [x] Enable Supabase Auth in project; configure redirect URL to GitHub Pages embed
+- [x] Add `_shared/auth.ts` (verify JWT, resolve student from `auth_user_id` or email claim)
+- [x] Update `manage-booking`: require Authorization header for book/cancel/waitlist; ignore body `studentId`
+- [x] Update `index.html`: login panel (email → magic link); session persistence; logout
+- [x] Link-on-first-login: match JWT email to `students.email`; set `auth_user_id`
+- [x] Handle roster email not yet in Auth (invite / "contact instructor" message)
+- [x] Update RLS if any student-facing reads need auth (optional: keep anon read for grid)
 
 ## Target Implementation Shape
 
@@ -63,7 +63,27 @@ await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: KINSAL_UR
 
 ## Implementation Notes
 
-<!-- Filled during implementation -->
+**Deployed:** Run migration + function deploy (see commands below).
+
+**Supabase Auth dashboard (required before magic links work):**
+1. Authentication → URL Configuration
+2. Site URL: `https://srepole-bpl.github.io/kinsal/`
+3. Redirect URLs: add `https://srepole-bpl.github.io/kinsal/` (and `http://localhost:*` for local testing if needed)
+
+**Deploy commands:**
+```bash
+supabase db query --linked --file supabase/migrations/student-auth.sql
+supabase functions deploy manage-booking --use-api
+```
+
+**Behavior:**
+- `check_email` / legacy `lookup`: roster check only — returns `{ found: boolean }`, no student id
+- `me`: requires JWT; returns linked student profile
+- `book` / `cancel` / `join_waitlist`: JWT required; server resolves `student_id` from auth — client `studentId` ignored
+- First login links `students.auth_user_id` when JWT email matches roster row
+- Grid reads remain anon (RLS unchanged); writes are auth-gated in edge function
+
+**Frontend:** email → roster check → `signInWithOtp` → magic link → session restored on load via `me` action.
 
 ## Navigation
 
