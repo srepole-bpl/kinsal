@@ -19,9 +19,9 @@
 | 1d. Instructor Settings UI | [01d-ui-instructor-settings.md](./01d-ui-instructor-settings.md) | Complete | `2c6b7f6` |
 | 2. Editable schedule | [02-schedule.md](./02-schedule.md) | Complete | `4739450` |
 | 3. Student auth | [03-student-auth.md](./03-student-auth.md) | Cancelled | reverted |
-| **4 — Student experience** | [04-phase4-overview.md](./04-phase4-overview.md) | ✅ Complete | pending |
-| 4a. Student UX | [04a-student-ux.md](./04a-student-ux.md) | ✅ Complete | pending |
-| 4b. Emails + reminders | [04b-emails-reminders.md](./04b-emails-reminders.md) | ✅ Complete | pending |
+| **4 — Student experience** | [04-phase4-overview.md](./04-phase4-overview.md) | ✅ Complete | `9866e1f` |
+| 4a. Student UX | [04a-student-ux.md](./04a-student-ux.md) | ✅ Complete | `9866e1f` |
+| 4b. Emails + reminders | [04b-emails-reminders.md](./04b-emails-reminders.md) | ✅ Complete | `9866e1f` |
 | **5 — Instructor ops** | [05-phase5-overview.md](./05-phase5-overview.md) | Pending | — |
 | 5a. Blocks + closed days | [05a-blocks-closed-days.md](./05a-blocks-closed-days.md) | Pending | — |
 | 5b. Roster CSV + limits | [05b-roster-limits.md](./05b-roster-limits.md) | Pending | — |
