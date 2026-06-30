@@ -1180,7 +1180,8 @@ async function renderDash(){
     <div class="section-label">weekly auto-reset</div>
     <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">all reservations clear automatically each sunday night via a server job.</p>
     <div class="section-label">pin management</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">change your instructor pin here — verified and stored server-side.</p>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.5rem">enter your <strong>4–6 digit pin</strong> (numbers only). do not paste a hash here, and do not edit PIN_HASH in supabase — this form handles everything.</p>
+    <p style="font-size:12px;color:var(--ink3);margin-bottom:.5rem">after changing, sign out and log in with your <strong>new digits</strong> on the pin screen.</p>
     <div style="margin-top:8px;background:var(--bg2);border-radius:8px;padding:.75rem 1rem;">
       <div style="display:grid;gap:8px;max-width:280px">
         <input type="password" id="current-pin" placeholder="current pin (4–6 digits)" maxlength="6" inputmode="numeric" autocomplete="current-password">
@@ -1674,7 +1675,7 @@ async function changePin(){
   document.getElementById('new-pin-setting').value='';
   document.getElementById('confirm-pin-setting').value='';
   logEvent('settings','Instructor PIN changed');
-  showToast('pin updated');
+  showToast('pin updated — sign out and use your new digits to log in');
 }
 
 /* ── INSTRUCTOR WRITES — all go through admin-action (token verified) ───────── */
