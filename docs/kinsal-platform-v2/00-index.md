@@ -17,7 +17,7 @@
 | 1b. API | [01b-api-resources-booking.md](./01b-api-resources-booking.md) | Complete | `2c6b7f6` |
 | 1c. Student grid UI | [01c-ui-student-grid.md](./01c-ui-student-grid.md) | Complete | `71da723` |
 | 1d. Instructor Settings UI | [01d-ui-instructor-settings.md](./01d-ui-instructor-settings.md) | Complete | `2c6b7f6` |
-| 2. Editable schedule | [02-schedule.md](./02-schedule.md) | In Progress | — |
+| 2. Editable schedule | [02-schedule.md](./02-schedule.md) | Complete | `4739450` |
 | 3. Student auth | [03-student-auth.md](./03-student-auth.md) | Pending | — |
 | **4 — Student experience** | [04-phase4-overview.md](./04-phase4-overview.md) | Pending | — |
 | 4a. Student UX | [04a-student-ux.md](./04a-student-ux.md) | Pending | — |
@@ -38,7 +38,7 @@
 
 ## Current Context
 
-Phase 1 complete and live. **Phase 2 coded** — run `supabase login` then apply `schedule.sql` and deploy functions. Student grid keeps classic one-row layout (decision from Phase 1c).
+Phase 2 **complete and deployed**. Next: **Phase 3** — student magic-link auth ([03-student-auth.md](./03-student-auth.md)).
 
 ## Architectural Decisions Made
 
