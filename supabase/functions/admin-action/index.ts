@@ -4,6 +4,13 @@
 // signed with JWT_SECRET (server-only), so a browser cannot forge it. This is
 // the function that closes the catastrophic hole: previously these writes ran
 // as anon, gated only by a client-side `if`.
+import { writeAudit, getRecentAuditLog } from "../_shared/audit.ts";
+import {
+  getStoredPinHash,
+  isValidPinHash,
+  setStoredPinHash,
+  verifyPinHash,
+} from "../_shared/pin.ts";
 import { json, preflight } from "../_shared/cors.ts";
 import { serviceClient } from "../_shared/db.ts";
 import { verifyInstructorToken } from "../_shared/jwt.ts";
@@ -74,6 +81,31 @@ Deno.serve(async (req) => {
 
   const db = serviceClient();
   const action = String(body.action || "");
+
+  if (action === "getAuditLog") {
+    const limit = parseInt(String(body.limit || "50"), 10);
+    const entries = await getRecentAuditLog(db, limit);
+    return json({ success: true, entries });
+  }
+
+  if (action === "changePin") {
+    const currentPinHash = String(body.currentPinHash || "");
+    const newPinHash = String(body.newPinHash || "");
+    if (!isValidPinHash(currentPinHash) || !isValidPinHash(newPinHash)) {
+      return json({ success: false, error: "invalid pin format" }, 400);
+    }
+    const stored = await getStoredPinHash(db);
+    if (!stored) return json({ success: false, error: "server not configured" }, 500);
+    if (!verifyPinHash(currentPinHash, stored)) {
+      return json({ success: false, error: "current pin is incorrect" }, 401);
+    }
+    if (verifyPinHash(currentPinHash, newPinHash)) {
+      return json({ success: false, error: "new pin must be different" }, 400);
+    }
+    await setStoredPinHash(db, newPinHash);
+    await writeAudit(db, "instructor", "change_pin", {});
+    return json({ success: true });
+  }
 
   // ── ROSTER (read full student list + stats for the dashboard) ───────────────
   if (action === "roster") {
@@ -178,6 +210,7 @@ Deno.serve(async (req) => {
       added++;
     }
 
+    await writeAudit(db, "instructor", "import_roster", { added, skipped: skipped.length });
     return json({ success: true, added, skipped });
   }
 
@@ -214,6 +247,7 @@ Deno.serve(async (req) => {
     const id = String(body.id || body.studentId || "");
     if (!id) return json({ success: false, error: "missing id" }, 400);
     await db.from("students").update({ booking_blocked_until: null }).eq("id", id);
+    await writeAudit(db, "instructor", "clear_no_show_block", { studentId: id });
     return json({ success: true });
   }
 
@@ -230,6 +264,7 @@ Deno.serve(async (req) => {
       no_show_threshold: parsed.limits.no_show_threshold,
     }).eq("id", 1);
     if (error) return json({ success: false, error: "could not save limits" }, 500);
+    await writeAudit(db, "instructor", "save_limits", parsed.limits);
     return json({ success: true, ...parsed.limits });
   }
 
@@ -249,6 +284,7 @@ Deno.serve(async (req) => {
     const id = "s" + Date.now();
     const { error } = await db.from("students").insert({ id, name, email });
     if (error) return json({ success: false, error: "could not add student" }, 500);
+    await writeAudit(db, "instructor", "add_student", { id, email });
     return json({ success: true, id });
   }
 
@@ -259,6 +295,7 @@ Deno.serve(async (req) => {
     await db.from("reservations").delete().eq("student_id", id);
     await db.from("waitlists").delete().eq("student_id", id);
     await db.from("students").delete().eq("id", id);
+    await writeAudit(db, "instructor", "remove_student", { id });
     return json({ success: true });
   }
 
@@ -273,6 +310,7 @@ Deno.serve(async (req) => {
       await db.from("reservations").delete().eq("key", k);
     }
     await promoteAndNotify(db, k);
+    await writeAudit(db, "instructor", "admin_cancel", { key: k, studentId: studentId || null });
     return json({ success: true });
   }
 
@@ -290,6 +328,7 @@ Deno.serve(async (req) => {
       student_id: r.student_id,
       logged_at: new Date().toISOString(),
     });
+    await writeAudit(db, "instructor", "no_show", { key: k, studentId: r.student_id });
     return json({ success: true });
   }
 
@@ -297,6 +336,7 @@ Deno.serve(async (req) => {
   if (action === "manualReset") {
     await db.from("reservations").delete().neq("key", "__none__");
     await db.from("waitlists").delete().neq("key", "__none__");
+    await writeAudit(db, "instructor", "manual_reset", {});
     return json({ success: true });
   }
 
@@ -375,6 +415,7 @@ Deno.serve(async (req) => {
       .from("wheels")
       .select("id, label, sort_order")
       .order("sort_order", { ascending: true });
+    await writeAudit(db, "instructor", "save_wheels", { count: (wheels || []).length });
     return json({ success: true, wheels: wheels || [] });
   }
 
@@ -434,6 +475,7 @@ Deno.serve(async (req) => {
       .from("rooms")
       .select("id, label, sort_order")
       .order("sort_order", { ascending: true });
+    await writeAudit(db, "instructor", "save_rooms", { count: (rooms || []).length });
     return json({ success: true, rooms: rooms || [] });
   }
 
@@ -512,6 +554,7 @@ Deno.serve(async (req) => {
       .from("resources")
       .select("id, room_id, label, category, capacity, sort_order")
       .order("sort_order", { ascending: true });
+    await writeAudit(db, "instructor", "save_resources", { count: (resources || []).length });
     return json({ success: true, resources: resources || [] });
   }
 
@@ -573,6 +616,11 @@ Deno.serve(async (req) => {
       if (error) return json({ success: false, error: "could not save time slots" }, 500);
     }
 
+    await writeAudit(db, "instructor", "save_schedule", {
+      days: schedule.days.length,
+      slots: schedule.slots.length,
+      timezone: schedule.timezone,
+    });
     return json({ success: true, ...schedule });
   }
 
@@ -599,6 +647,7 @@ Deno.serve(async (req) => {
     }
 
     const blocks = await loadSlotBlocks(db);
+    await writeAudit(db, "instructor", "save_blocks", { count: blocks.length });
     return json({ success: true, blocks });
   }
 
@@ -625,6 +674,7 @@ Deno.serve(async (req) => {
     }
 
     const closedDays = await loadClosedDays(db);
+    await writeAudit(db, "instructor", "save_closed_days", { count: closedDays.length });
     return json({ success: true, closedDays });
   }
 

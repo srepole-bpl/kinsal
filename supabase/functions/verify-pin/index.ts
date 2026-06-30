@@ -1,30 +1,21 @@
 // verify-pin
-// Compares the submitted PIN hash to PIN_HASH (server secret) in constant time.
+// Compares the submitted PIN hash to stored hash (DB or PIN_HASH env fallback).
 // On success, mints a short-lived signed instructor token. Includes a
 // database-backed lockout so the PIN can't be brute-forced by hammering this
 // endpoint directly (the browser's own lockout is irrelevant to an attacker).
 import { json, preflight } from "../_shared/cors.ts";
 import { createInstructorToken } from "../_shared/jwt.ts";
 import { serviceClient } from "../_shared/db.ts";
+import { getStoredPinHash, verifyPinHash } from "../_shared/pin.ts";
 
 const MAX_FAILS = 5;
 const WINDOW_MS = 15 * 60 * 1000;
 const LOCKOUT_MS = 15 * 60 * 1000;
 const TOKEN_TTL_S = 20 * 60;
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return preflight();
   if (req.method !== "POST") return json({ success: false, error: "method not allowed" }, 405);
-
-  const expected = Deno.env.get("PIN_HASH") || "";
-  if (!expected) return json({ success: false, error: "server not configured" }, 500);
 
   let body: { pinHash?: string };
   try {
@@ -35,6 +26,9 @@ Deno.serve(async (req) => {
   const pinHash = String(body?.pinHash || "");
 
   const db = serviceClient();
+  const expected = await getStoredPinHash(db);
+  if (!expected) return json({ success: false, error: "server not configured" }, 500);
+
   const now = Date.now();
 
   const { data: th } = await db.from("auth_throttle").select("*").eq("id", 1).single();
@@ -46,7 +40,7 @@ Deno.serve(async (req) => {
     );
   }
 
-  const ok = pinHash.length > 0 && timingSafeEqual(pinHash, expected);
+  const ok = verifyPinHash(pinHash, expected);
 
   if (ok) {
     await db.from("auth_throttle").update({
@@ -59,7 +53,6 @@ Deno.serve(async (req) => {
     return json({ success: true, token, expires: now + TOKEN_TTL_S * 1000 });
   }
 
-  // Record the failure and lock if over the threshold.
   const wStart = th?.window_start ? new Date(th.window_start).getTime() : 0;
   let count: number;
   let windowStart: string | null;

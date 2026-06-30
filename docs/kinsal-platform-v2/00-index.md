@@ -25,7 +25,7 @@
 | **5 — Instructor ops** | [05-phase5-overview.md](./05-phase5-overview.md) | Pending | — |
 | 5a. Blocks + closed days | [05a-blocks-closed-days.md](./05a-blocks-closed-days.md) | ✅ Complete | `fd1b6fc` |
 | 5b. Roster CSV + limits | [05b-roster-limits.md](./05b-roster-limits.md) | ✅ Complete | `e80ae5d` |
-| 5c. Audit + PIN | [05c-audit-pin.md](./05c-audit-pin.md) | Pending | — |
+| 5c. Audit + PIN | [05c-audit-pin.md](./05c-audit-pin.md) | ✅ Complete | pending |
 | 6. Communications | [06-communications.md](./06-communications.md) | Pending | — |
 | 7. Polish + security | [07-polish-security.md](./07-polish-security.md) | Pending | — |
 

@@ -8,6 +8,7 @@
 // Protected by CRON_SECRET (sent as the x-cron-secret header by the cron job),
 // because this function is deployed with --no-verify-jwt so the scheduler can
 // reach it. Without the secret it refuses to run.
+import { writeAudit } from "../_shared/audit.ts";
 import { json } from "../_shared/cors.ts";
 import { serviceClient } from "../_shared/db.ts";
 import { incrementNoShowCount, loadStudioLimits } from "../_shared/limits.ts";
@@ -46,6 +47,10 @@ Deno.serve(async (req) => {
     await incrementNoShowCount(db, ns.student_id, limits);
     await promoteAndNotify(db, ns.key);
     released++;
+  }
+
+  if (released > 0) {
+    await writeAudit(db, "system", "release_noshows", { released });
   }
 
   return json({ released });

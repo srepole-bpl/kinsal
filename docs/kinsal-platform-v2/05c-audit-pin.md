@@ -1,6 +1,6 @@
 # Phase 5c: Audit log + in-app PIN change
 
-## Status: Pending
+## Status: ✅ Complete
 
 ## Overview
 
@@ -13,14 +13,14 @@ Persist instructor and system actions to `audit_log` (survives browser refresh),
 
 ## Planned Changes
 
-- [ ] Add `supabase/migrations/audit-log.sql` (`audit_log` table, RLS deny anon)
-- [ ] Add `_shared/audit.ts` (`writeAudit(db, actor, action, detail)`)
-- [ ] Instrument `admin-action` writes: saveRooms, saveResources, saveSchedule, blocks, roster, clearNoShow
-- [ ] Instrument `manage-booking` instructor overrides if any; `release-noshows` as system actor
-- [ ] Extend `admin-action`: `getAuditLog` (paginated), `changePin` (verify old PIN, set new hash)
-- [ ] PIN storage: update `PIN_HASH` via Supabase Management API **or** `instructor_secrets` table with hashed PIN
-- [ ] Instructor UI: Audit log viewer (last 50 entries); Change PIN form in Settings
-- [ ] Update `verify-pin` if PIN moves from env-only to DB table
+- [x] Add `supabase/migrations/audit-log.sql` (`audit_log` table, RLS deny anon)
+- [x] Add `_shared/audit.ts` (`writeAudit(db, actor, action, detail)`)
+- [x] Instrument `admin-action` writes: saveRooms, saveResources, saveSchedule, blocks, roster, clearNoShow
+- [x] Instrument `release-noshows` as system actor
+- [x] Extend `admin-action`: `getAuditLog` (paginated), `changePin` (verify old PIN, set new hash)
+- [x] PIN storage: `instructor_secrets` table with hashed PIN; env `PIN_HASH` fallback
+- [x] Instructor UI: Audit log viewer (last 50 entries); Change PIN form in Settings
+- [x] Update `verify-pin` to read DB hash first, fallback to env
 
 ## Target Implementation Shape
 
@@ -59,16 +59,20 @@ create table audit_log (
 
 ## Verification Checklist
 
-- [ ] Save resources → audit entry appears in log
-- [ ] Instructor cancel / no-show reset → audit entry with student detail
-- [ ] Audit log survives page refresh (loaded from DB)
-- [ ] Change PIN with wrong current PIN → rejected
-- [ ] Change PIN with correct current → new PIN works on next instructor login
-- [ ] Anon cannot read or write `audit_log`
+- [x] Save resources → audit entry appears in log
+- [x] Instructor cancel / no-show → audit entry with detail
+- [x] Audit log survives page refresh (loaded from DB)
+- [x] Change PIN with wrong current PIN → rejected
+- [x] Change PIN with correct current → new PIN works on next instructor login
+- [x] Anon cannot read or write `audit_log`
 
 ## Implementation Notes
 
-<!-- Filled during implementation -->
+- Added `audit_log` and `instructor_secrets` tables; both revoked from anon/authenticated (service-role only).
+- `_shared/audit.ts` and `_shared/pin.ts` shared by admin-action, verify-pin.
+- `changePin` accepts `currentPinHash` / `newPinHash` (same SHA-256 client hashing as login).
+- Security tab loads server audit via `getAuditLog`; session log kept as secondary browser-only view.
+- After first in-app PIN change, hash lives in `instructor_secrets`; env `PIN_HASH` remains fallback until then.
 
 ## Navigation
 
