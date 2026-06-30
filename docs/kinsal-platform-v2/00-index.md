@@ -26,7 +26,7 @@
 | 5a. Blocks + closed days | [05a-blocks-closed-days.md](./05a-blocks-closed-days.md) | ✅ Complete | `fd1b6fc` |
 | 5b. Roster CSV + limits | [05b-roster-limits.md](./05b-roster-limits.md) | ✅ Complete | `e80ae5d` |
 | 5c. Audit + PIN | [05c-audit-pin.md](./05c-audit-pin.md) | ✅ Complete | `6c749f5` |
-| 6. Communications | [06-communications.md](./06-communications.md) | ✅ Complete | pending |
+| 6. Communications | [06-communications.md](./06-communications.md) | ✅ Complete | `6e6b3eb` |
 | 7. Polish + security | [07-polish-security.md](./07-polish-security.md) | Pending | — |
 
 ## Status Legend
