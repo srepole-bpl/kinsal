@@ -267,6 +267,12 @@ let rooms=[], resources=[], resourceMap={}, resourcesByRoom={};
 let slotBlocks=[], closedDays=[];
 let maxBookingsPerWeek=4, noShowThreshold=3;
 let draftMaxBookingsPerWeek=4, draftNoShowThreshold=3;
+let draftEmailTemplates=[];
+const EMAIL_TEMPLATE_META=[
+  {key:'waitlist_promotion',label:'waitlist promotion',vars:'{{student_first_name}}, {{day}}, {{slot_label}}, {{resource_label}}, {{category_label}}'},
+  {key:'booking_confirmation',label:'booking confirmation',vars:'{{student_first_name}}, {{day}}, {{slot_label}}, {{slot_short_label}}, {{resource_label}}, {{category_label}}'},
+  {key:'reminder',label:'reminder',vars:'{{student_first_name}}, {{day}}, {{slot_label}}, {{slot_short_label}}, {{resource_label}}, {{category_label}}'}
+];
 let roster=[], rosterMap={};
 let noShowTimers={}, countdownIntervals={};
 let currentStudent=null, currentDay=SCHEDULE_FALLBACK_DAYS[0], pendingAction=null;
@@ -1099,6 +1105,18 @@ async function renderDash(){
       <input type="number" id="limit-no-show-threshold" min="1" max="20" value="${draftNoShowThreshold}" style="width:100%;margin-top:4px"></div>
     </div>
     <button class="btn btn-sm btn-primary" onclick="saveLimits()">save limits</button>
+    <div class="section-label" style="margin-top:16px">email templates</div>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">customize automated emails. unknown {{variables}} render as empty.</p>
+    <div id="email-template-settings"><p class="muted" style="font-size:12px">loading templates…</p></div>
+    <button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="saveEmailTemplates()">save templates</button>
+    <div class="section-label" style="margin-top:16px">broadcast email</div>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">send one message to the full roster. limited to once per minute. use {{student_first_name}} or {{student_name}} in subject/body.</p>
+    <div style="display:grid;gap:8px;max-width:560px">
+      <input type="text" id="broadcast-subject" placeholder="subject" maxlength="200" style="width:100%">
+      <textarea id="broadcast-body" rows="6" placeholder="html body" maxlength="10000" style="width:100%;font-family:inherit"></textarea>
+      <button class="btn btn-sm btn-primary" onclick="confirmBroadcastEmail()">send broadcast</button>
+      <div id="broadcast-result" class="muted" style="font-size:12px;display:none"></div>
+    </div>
     <div class="section-label" style="margin-top:16px">booking window</div>
     <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">opens 2 hours before each slot starts. closes 1 hour before the slot ends. enforced server-side.</p>
     <div class="section-label">no-show window</div>
@@ -1123,6 +1141,7 @@ async function renderDash(){
   renderScheduleSettingsList();
   renderBlockSettingsList();
   renderClosedDaysList();
+  renderEmailTemplateSettings();
 }
 
 function renderSecurityLog(){
@@ -1527,6 +1546,63 @@ async function saveLimits(){
   logEvent('settings','Booking limits updated');
   showToast('limits saved');
 }
+async function renderEmailTemplateSettings(){
+  const el=document.getElementById('email-template-settings');
+  if(!el) return;
+  const data=await adminCall('getEmailTemplates',{});
+  if(!data?.success){
+    el.innerHTML='<p class="muted" style="font-size:12px">could not load email templates.</p>';
+    return;
+  }
+  draftEmailTemplates=(data.templates||[]).map(t=>({...t}));
+  el.innerHTML=draftEmailTemplates.map((t,i)=>{
+    const meta=EMAIL_TEMPLATE_META.find(m=>m.key===t.key)||{label:t.key,vars:''};
+    return `<div style="background:var(--bg2);border-radius:8px;padding:.75rem 1rem;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:500;margin-bottom:6px">${esc(meta.label)}</div>
+      <p style="font-size:11px;color:var(--ink3);margin-bottom:8px">variables: ${esc(meta.vars)}</p>
+      <label style="font-size:12px;color:var(--ink3)">subject</label>
+      <input type="text" class="tpl-subject" data-idx="${i}" value="${esc(t.subject)}" maxlength="200" style="width:100%;margin:4px 0 8px">
+      <label style="font-size:12px;color:var(--ink3)">body (html)</label>
+      <textarea class="tpl-body" data-idx="${i}" rows="5" maxlength="10000" style="width:100%;font-family:monospace;font-size:11px">${esc(t.body_html)}</textarea>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.tpl-subject').forEach(inp=>{
+    inp.oninput=()=>{ draftEmailTemplates[+inp.dataset.idx].subject=inp.value; };
+  });
+  el.querySelectorAll('.tpl-body').forEach(inp=>{
+    inp.oninput=()=>{ draftEmailTemplates[+inp.dataset.idx].body_html=inp.value; };
+  });
+}
+async function saveEmailTemplates(){
+  if(!requireSession()) return;
+  const payload=draftEmailTemplates.map(t=>({key:t.key,subject:String(t.subject||'').trim(),body_html:String(t.body_html||'').trim()}));
+  const data=await adminCall('saveEmailTemplates',{templates:JSON.stringify(payload)});
+  if(!data?.success){ showToast(data?.error||'could not save templates'); return; }
+  draftEmailTemplates=data.templates||payload;
+  logEvent('settings','Email templates updated');
+  showToast('templates saved');
+}
+function confirmBroadcastEmail(){
+  if(!requireSession()) return;
+  const subject=document.getElementById('broadcast-subject')?.value.trim()||'';
+  const body=document.getElementById('broadcast-body')?.value.trim()||'';
+  if(!subject||!body){ showToast('subject and body required'); return; }
+  pendingAction=async()=>{
+    const out=document.getElementById('broadcast-result');
+    if(out){ out.style.display='block'; out.textContent='sending…'; }
+    const data=await adminCall('broadcastEmail',{subject,body});
+    if(!data?.success){
+      if(out) out.textContent=data?.error||'broadcast failed';
+      showToast(data?.error||'broadcast failed');
+      return;
+    }
+    if(out) out.textContent=`sent ${data.sent} of ${data.total}${data.failed?` (${data.failed} failed)`:''}`;
+    logEvent('settings',`Broadcast sent to ${data.sent}/${data.total}`);
+    showToast(`broadcast sent (${data.sent}/${data.total})`);
+  };
+  openModal('send broadcast',`email every student on the roster (${roster.length} students)? this cannot be undone.`,'send to all');
+}
+
 async function changePin(){
   if(!requireSession()) return;
   const current=document.getElementById('current-pin')?.value.trim()||'';
@@ -1597,6 +1673,7 @@ function showDashTab(tab,btn){
     document.getElementById('dash-'+t).style.display=t===tab?'block':'none';
   });
   if(tab==='security') renderSecurityLog();
+  if(tab==='settings') renderEmailTemplateSettings();
 }
 
 /* ── MODAL ─────────────────────────────────────────────────────────────────── */

@@ -4,6 +4,11 @@
 // signed with JWT_SECRET (server-only), so a browser cannot forge it. This is
 // the function that closes the catastrophic hole: previously these writes ran
 // as anon, gated only by a client-side `if`.
+import { sendBroadcastEmails } from "../_shared/email.ts";
+import {
+  loadAllEmailTemplates,
+  parseEmailTemplatesPayload,
+} from "../_shared/templates.ts";
 import { writeAudit, getRecentAuditLog } from "../_shared/audit.ts";
 import {
   getStoredPinHash,
@@ -47,6 +52,7 @@ import {
 } from "../_shared/wheels.ts";
 
 const MAX_STUDENTS = 200;
+const BROADCAST_COOLDOWN_MS = 60_000;
 
 function isValidEmail(e: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
@@ -105,6 +111,89 @@ Deno.serve(async (req) => {
     await setStoredPinHash(db, newPinHash);
     await writeAudit(db, "instructor", "change_pin", {});
     return json({ success: true });
+  }
+
+  if (action === "getEmailTemplates") {
+    const templates = await loadAllEmailTemplates(db);
+    return json({ success: true, templates });
+  }
+
+  if (action === "saveEmailTemplates") {
+    let incoming: unknown;
+    try {
+      incoming = JSON.parse(String(body.templates || "[]"));
+    } catch {
+      return json({ success: false, error: "invalid templates data" }, 400);
+    }
+    const parsed = parseEmailTemplatesPayload(incoming);
+    if (!parsed.ok) return json({ success: false, error: parsed.error }, 400);
+
+    for (const template of parsed.templates) {
+      const { error } = await db.from("email_templates").upsert({
+        key: template.key,
+        subject: template.subject,
+        body_html: template.body_html,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) return json({ success: false, error: "could not save templates" }, 500);
+    }
+
+    await writeAudit(db, "instructor", "save_email_templates", {
+      keys: parsed.templates.map((t) => t.key),
+    });
+    const templates = await loadAllEmailTemplates(db);
+    return json({ success: true, templates });
+  }
+
+  if (action === "broadcastEmail") {
+    const subject = String(body.subject || "").trim();
+    const bodyHtml = String(body.body || body.bodyHtml || "").trim();
+    if (!subject || subject.length > 200) {
+      return json({ success: false, error: "invalid subject" }, 400);
+    }
+    if (!bodyHtml || bodyHtml.length > 10000) {
+      return json({ success: false, error: "invalid body" }, 400);
+    }
+
+    const { data: settings } = await db
+      .from("studio_settings")
+      .select("last_broadcast_at")
+      .eq("id", 1)
+      .maybeSingle();
+    if (settings?.last_broadcast_at) {
+      const elapsed = Date.now() - new Date(settings.last_broadcast_at).getTime();
+      if (elapsed < BROADCAST_COOLDOWN_MS) {
+        return json({
+          success: false,
+          error: "please wait at least 1 minute between broadcasts",
+        }, 429);
+      }
+    }
+
+    const { data: studs } = await db
+      .from("students")
+      .select("name, email")
+      .not("email", "is", null);
+    const recipients = (studs || []).filter((s: { email?: string }) =>
+      String(s.email || "").trim().length > 0
+    ) as { name: string; email: string }[];
+
+    if (recipients.length === 0) {
+      return json({ success: false, error: "no students with email on roster" }, 400);
+    }
+
+    await db.from("studio_settings").update({
+      last_broadcast_at: new Date().toISOString(),
+    }).eq("id", 1);
+
+    const { sent, failed } = await sendBroadcastEmails(recipients, subject, bodyHtml);
+    await writeAudit(db, "instructor", "broadcast_email", {
+      subject,
+      sent,
+      failed,
+      total: recipients.length,
+    });
+    return json({ success: true, sent, failed, total: recipients.length });
   }
 
   // ── ROSTER (read full student list + stats for the dashboard) ───────────────

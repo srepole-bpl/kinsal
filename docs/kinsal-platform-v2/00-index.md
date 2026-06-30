@@ -22,11 +22,11 @@
 | **4 — Student experience** | [04-phase4-overview.md](./04-phase4-overview.md) | ✅ Complete | `9866e1f` |
 | 4a. Student UX | [04a-student-ux.md](./04a-student-ux.md) | ✅ Complete | `9866e1f` |
 | 4b. Emails + reminders | [04b-emails-reminders.md](./04b-emails-reminders.md) | ✅ Complete | `9866e1f` |
-| **5 — Instructor ops** | [05-phase5-overview.md](./05-phase5-overview.md) | Pending | — |
+| **5 — Instructor ops** | [05-phase5-overview.md](./05-phase5-overview.md) | ✅ Complete | `6c749f5` |
 | 5a. Blocks + closed days | [05a-blocks-closed-days.md](./05a-blocks-closed-days.md) | ✅ Complete | `fd1b6fc` |
 | 5b. Roster CSV + limits | [05b-roster-limits.md](./05b-roster-limits.md) | ✅ Complete | `e80ae5d` |
 | 5c. Audit + PIN | [05c-audit-pin.md](./05c-audit-pin.md) | ✅ Complete | `6c749f5` |
-| 6. Communications | [06-communications.md](./06-communications.md) | Pending | — |
+| 6. Communications | [06-communications.md](./06-communications.md) | ✅ Complete | pending |
 | 7. Polish + security | [07-polish-security.md](./07-polish-security.md) | Pending | — |
 
 ## Status Legend
@@ -38,7 +38,7 @@
 
 ## Current Context
 
-- Phase 5b **complete and deployed**. Next: **Phase 5c** — audit log + in-app PIN ([05c-audit-pin.md](./05c-audit-pin.md)).
+- Phase 6 **complete and deployed**. Next: **Phase 7** — polish + security ([07-polish-security.md](./07-polish-security.md)).
 
 ## Architectural Decisions Made
 

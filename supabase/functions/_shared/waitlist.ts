@@ -4,6 +4,7 @@
 // one-per-day rule). All writes happen with the service-role client, so this
 // works even with RLS locked down.
 import { sendWaitlistEmail } from "./email.ts";
+import { sendSms, waitlistSmsBody } from "./sms.ts";
 import { getResource, nextFreeSpot } from "./resources.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -55,12 +56,25 @@ export async function promoteAndNotify(db: any, slotKey: string): Promise<void> 
 
   const { data: stu } = await db
     .from("students")
-    .select("name, email")
+    .select("name, email, phone, sms_opt_in")
     .eq("id", next.student_id)
     .single();
 
   if (stu?.email) {
     await sendWaitlistEmail(db, stu.email, stu.name ?? "", slotKey);
+  }
+
+  if (stu?.sms_opt_in && stu?.phone) {
+    const slotId = parts[1];
+    const resourceLabel = resource.label;
+    const slotLabel = slotId === "am"
+      ? "morning"
+      : slotId === "pm"
+      ? "evening"
+      : slotId;
+    const first = (stu.name || "there").split(" ")[0];
+    sendSms(stu.phone, waitlistSmsBody(first, day, slotLabel, resourceLabel))
+      .catch((e) => console.error("waitlist sms failed:", e));
   }
 }
 
