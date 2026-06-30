@@ -76,10 +76,10 @@ create unique index if not exists reservations_key_spot_unique
 
 ## Implementation Notes
 
-- Migration file created at `supabase/migrations/resources-rooms.sql`
+- Migration applied via `supabase db query --linked --file supabase/migrations/resources-rooms.sql`
 - Drops `reservations_key_unique` on `key` only; adds unique index on `(key, spot_index)`
 - `wheels` table kept for rollback; frontend falls back to `wheels` read if `resources` empty
-- **Blocked:** `supabase db query --linked` returned 401 Unauthorized — re-run after `supabase login`
+- Commit: `2c6b7f6`
 
 ## Navigation
 

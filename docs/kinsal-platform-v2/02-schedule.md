@@ -1,6 +1,6 @@
 # Phase 2: Editable schedule
 
-## Status: Pending
+## Status: In Progress
 
 ## Overview
 
@@ -12,13 +12,14 @@ Move hardcoded `DAYS`, `SLOTS`, and `America/New_York` from `index.html` and `ma
 
 ## Planned Changes
 
-- [ ] Add `supabase/migrations/schedule.sql` (`studio_days`, `schedule_slots`, `studio_settings`)
-- [ ] Seed current v1 schedule: Tue/Thu/Sat/Sun; `am` 9–13, `pm` 13–17; offsets -120/-60; timezone `America/New_York`
-- [ ] Add `_shared/schedule.ts` (load schedule, validate overlaps, `isBookingOpen(day, slotId, now)`)
-- [ ] Update `manage-booking/index.ts`: replace `STUDIO_DAYS`/`SLOTS`/`STUDIO_TZ` with DB reads
-- [ ] Extend `admin-action`: `getSchedule`, `saveSchedule` (days + slots + settings JSON)
-- [ ] Update `index.html`: `loadSchedule()`; dynamic day tabs and slot rows; Settings "Schedule" panel
-- [ ] Deploy migration + functions; push `index.html`
+- [x] Add `supabase/migrations/schedule.sql` (`studio_days`, `schedule_slots`, `studio_settings`)
+- [x] Seed current schedule: Tue/Thu/Sat/Sun; `am` 9–13, `pm` 16–20; offsets -120/-60; timezone `America/New_York`
+- [x] Add `_shared/schedule.ts` (load schedule, validate overlaps, `isBookingOpen`)
+- [x] Update `manage-booking/index.ts`: replace hardcoded schedule with DB reads
+- [x] Extend `admin-action`: `getSchedule`, `saveSchedule`
+- [x] Update `index.html`: `loadSchedule()`; dynamic day tabs; Settings schedule panel
+- [ ] Run migration + deploy functions *(requires `supabase login`)*
+- [ ] Push `index.html` to GitHub
 
 ## Target Implementation Shape
 

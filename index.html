@@ -227,11 +227,12 @@ const SUPABASE_KEY = 'sb_publishable_bx8TXtDlUnplrTmyZzNgaA_MunGW_f5';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const EDGE = SUPABASE_URL + '/functions/v1';
 
-const DAYS  = ['Tuesday','Thursday','Saturday','Sunday'];
-const SLOTS = [
-  {id:'am',label:'morning',time:'9:00 am – 1:00 pm',hours:4,start:9,end:13},
-  {id:'pm',label:'evening',time:'4:00 pm – 8:00 pm',hours:4,start:16,end:20}
+const SCHEDULE_FALLBACK_DAYS=['Tuesday','Thursday','Saturday','Sunday'];
+const SCHEDULE_FALLBACK_SLOTS=[
+  {id:'am',label:'morning',start_hour:9,end_hour:13,open_offset_minutes:-120,close_offset_minutes:-60,sort_order:0},
+  {id:'pm',label:'evening',start_hour:16,end_hour:20,open_offset_minutes:-120,close_offset_minutes:-60,sort_order:1}
 ];
+const WEEKDAY_OPTIONS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const RESOURCES_FALLBACK=[
   {id:'shimpo',room_id:'main-studio',label:'Shimpo',category:'wheel',capacity:1,sort_order:0},
   {id:'pacifica',room_id:'main-studio',label:'Pacifica',category:'wheel',capacity:1,sort_order:1},
@@ -249,12 +250,14 @@ const NOSHOW_RELEASE_MIN = 30;
 const MAX_LOG_ENTRIES    = 100;
 const MAX_NAME_LEN       = 40;
 
+let studioDays=[], scheduleSlots=[], studioTimezone='America/New_York';
+let draftScheduleDays=[], draftScheduleSlots=[], draftTimezone='America/New_York';
 let students=[], reservations={}, waitlists={};
 let rooms=[], resources=[], resourceMap={}, resourcesByRoom={};
 let draftRooms=[], draftResources=[];
 let roster=[], rosterMap={};
 let noShowTimers={}, countdownIntervals={};
-let currentStudent=null, currentDay=DAYS[0], pendingAction=null;
+let currentStudent=null, currentDay=SCHEDULE_FALLBACK_DAYS[0], pendingAction=null;
 let instructorToken=null, instructorExpires=0, sessionTimer=null;
 let pinAttempts=0, pinLockedUntil=0, lastActionTime={}, securityLog=[];
 const bookingWindow=[];
@@ -272,7 +275,25 @@ function rebuildResourcesByRoom(){
     resourcesByRoom[r.room_id].push(r);
   });
 }
-function eachResourceSlot(cb){ DAYS.forEach(d=>SLOTS.forEach(s=>resources.forEach(r=>cb(d,s,r)))); }
+function formatSlotTime(start,end){
+  const fmt=h=>{ if(h===0||h===24) return '12:00 am'; if(h===12) return '12:00 pm'; return h<12?`${h}:00 am`:`${h-12}:00 pm`; };
+  return `${fmt(start)} – ${fmt(end)}`;
+}
+function enrichSlot(sl){
+  const start=sl.start_hour??sl.start;
+  const end=sl.end_hour??sl.end;
+  return {...sl,start,end,start_hour:start,end_hour:end,time:sl.time||formatSlotTime(start,end),hours:end-start,
+    open_offset_minutes:sl.open_offset_minutes??-120,close_offset_minutes:sl.close_offset_minutes??-60};
+}
+function getDays(){
+  if(!studioDays.length) return SCHEDULE_FALLBACK_DAYS.slice();
+  return [...studioDays].sort((a,b)=>a.sort_order-b.sort_order).map(d=>d.weekday);
+}
+function getSlots(){
+  if(!scheduleSlots.length) return SCHEDULE_FALLBACK_SLOTS.map(enrichSlot);
+  return [...scheduleSlots].sort((a,b)=>a.sort_order-b.sort_order).map(enrichSlot);
+}
+function eachResourceSlot(cb){ getDays().forEach(d=>getSlots().forEach(s=>resources.forEach(r=>cb(d,s,r)))); }
 function sanitizeResourceName(s){ return String(s).replace(/[<>"'&\/\\;|]/g,'').replace(/\s+/g,' ').trim().slice(0,40); }
 function sanitizeRoomName(s){ return sanitizeResourceName(s); }
 function bookedCount(k){ return (reservations[k]||[]).length; }
@@ -382,9 +403,26 @@ async function loadResources(){
   rebuildResourceMap();
   rebuildResourcesByRoom();
 }
+async function loadSchedule(){
+  const {data:settings,error:se}=await db.from('studio_settings').select('timezone').eq('id',1).maybeSingle();
+  const {data:days,error:de}=await db.from('studio_days').select('weekday,sort_order').order('sort_order');
+  const {data:slots,error:sl}=await db.from('schedule_slots').select('*').order('sort_order');
+  studioTimezone=settings?.timezone||'America/New_York';
+  if(de||!days||!days.length){
+    studioDays=SCHEDULE_FALLBACK_DAYS.map((weekday,i)=>({weekday,sort_order:i}));
+    if(de) logEvent('db-error','loadSchedule days: '+de.message);
+  } else studioDays=days;
+  if(sl||!slots||!slots.length){
+    scheduleSlots=SCHEDULE_FALLBACK_SLOTS.map(enrichSlot);
+    if(sl) logEvent('db-error','loadSchedule slots: '+sl.message);
+  } else scheduleSlots=slots.map(enrichSlot);
+  const dayList=getDays();
+  if(!dayList.includes(currentDay)) currentDay=dayList[0];
+}
 async function loadCatalog(){
   await loadRooms();
   await loadResources();
+  await loadSchedule();
 }
 async function loadStudents(){
   const {data,error}=await db.from('student_directory').select('*').order('name');
@@ -465,23 +503,22 @@ async function refreshStudentStats(){
 
 /* ── BOOKING WINDOW (client preview only; the SERVER enforces it for real) ── */
 function canBookClientSide(day,slotId){
-  const now=new Date();
-  const dayIdx=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const target=dayIdx.indexOf(day), today=now.getDay();
-  const sl=SLOTS.find(s=>s.id===slotId);
-  if(!sl) return false;
-  const diff=(target-today+7)%7;
-  const slotStart=new Date(now);
-  slotStart.setDate(now.getDate()+diff);
-  slotStart.setHours(sl.start,0,0,0);
-  const cutoff=new Date(slotStart);
-  cutoff.setHours(sl.end-1,0,0,0);
-  if(diff===0&&now<cutoff) return true;
-  const diffHrs=(slotStart-now)/3600000;
-  return diffHrs<=2&&diffHrs>0;
+  const sl=getSlots().find(s=>s.id===slotId);
+  if(!sl||!getDays().includes(day)) return false;
+  const week=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const target=week.indexOf(day);
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:studioTimezone,weekday:'long',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date());
+  const wd=parts.find(p=>p.type==='weekday')?.value??'';
+  const hh=parseInt(parts.find(p=>p.type==='hour')?.value??'0',10);
+  const mm=parseInt(parts.find(p=>p.type==='minute')?.value??'0',10);
+  if(week.indexOf(wd)!==target) return false;
+  const minutes=hh*60+mm;
+  const openMin=sl.start*60+(sl.open_offset_minutes??-120);
+  const closeMin=sl.end*60+(sl.close_offset_minutes??-60);
+  return minutes>=openMin&&minutes<closeMin;
 }
 function studentHasBookingToday(day){
-  return SLOTS.some(s=>resources.some(r=>isBookedByMe(key(day,s.id,r.id))));
+  return getSlots().some(s=>resources.some(r=>isBookedByMe(key(day,s.id,r.id))));
 }
 
 async function bookSlot(day,slotId,resourceId){
@@ -493,7 +530,7 @@ async function bookSlot(day,slotId,resourceId){
   const k=key(day,slotId,resourceId);
   const res=resourceMap[resourceId];
   if(isSlotFull(k,res?.capacity||1)){ showRateBanner('that slot was just taken',true); return; }
-  const sl=SLOTS.find(s=>s.id===slotId);
+  const sl=getSlots().find(s=>s.id===slotId);
   pendingAction=async()=>{
     const {data}=await edgeCall('manage-booking',{action:'book',studentId:currentStudent.id,day,slotId,resourceId});
     if(!data.success){ showRateBanner(data.error||'booking failed',true); logEvent('booking-fail',data.error); await loadReservations(); renderSlots(); return; }
@@ -621,7 +658,7 @@ function requireSession(){
 
 /* ── RENDER: STUDENT GRID ──────────────────────────────────────────────────── */
 function renderDayTabs(){
-  document.getElementById('day-tabs').innerHTML=DAYS.map(d=>
+  document.getElementById('day-tabs').innerHTML=getDays().map(d=>
     `<button class="day-tab${d===currentDay?' active':''}" onclick="setDay('${d}')" role="tab" aria-selected="${d===currentDay}">${d.toLowerCase()}</button>`
   ).join('');
 }
@@ -630,7 +667,7 @@ function setDay(d){ currentDay=d; renderDayTabs(); renderSlots(); }
 function renderSlots(){
   const area=document.getElementById('slot-area');
   let html='';
-  SLOTS.forEach(s=>{
+  getSlots().forEach(s=>{
     const bookable=canBookClientSide(currentDay,s.id);
     const allFull=sortedResources().every(r=>isSlotFull(key(currentDay,s.id,r.id),r.capacity));
     const badge=bookable?(allFull?'<span class="slot-label badge-full">full</span>':'<span class="slot-label badge-open">open</span>'):'<span class="slot-label badge-locked">opens 2 hrs before</span>';
@@ -695,13 +732,13 @@ async function renderDash(){
     <div class="metric"><div class="metric-val">${wlCount}</div><div class="metric-label">on waitlists</div></div>`;
 
   let todayHtml='';
-  DAYS.forEach(d=>{
+  getDays().forEach(d=>{
     todayHtml+=`<div class="section-label">${esc(d)}</div>`;
     rooms.forEach(room=>{
       const roomResources=resourcesByRoom[room.id]||[];
       if(!roomResources.length) return;
       todayHtml+=`<div class="room-header">${esc(room.label)}</div>`;
-      SLOTS.forEach(s=>roomResources.forEach(r=>{
+      getSlots().forEach(s=>roomResources.forEach(r=>{
         const k=key(d,s.id,r.id),booked=reservations[k]||[];
         const wl=waitlists[k]||[],isNS=noShowTimers[k]!==undefined;
         const cat=categoryLabel(r.category);
@@ -771,6 +808,9 @@ async function renderDash(){
 
   draftRooms=rooms.map(r=>({id:r.id,label:r.label}));
   draftResources=resources.map(r=>({id:r.id,room_id:r.room_id,label:r.label,category:r.category,capacity:r.capacity}));
+  draftScheduleDays=studioDays.map(d=>({weekday:d.weekday,sort_order:d.sort_order}));
+  draftScheduleSlots=scheduleSlots.map(s=>({id:s.id,label:s.label,start_hour:s.start_hour,end_hour:s.end_hour,open_offset_minutes:s.open_offset_minutes??-120,close_offset_minutes:s.close_offset_minutes??-60}));
+  draftTimezone=studioTimezone;
   document.getElementById('dash-settings').innerHTML=`<div class="card">
     <div class="section-label">rooms</div>
     <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">custom room names for grouping resources on the booking grid.</p>
@@ -785,6 +825,21 @@ async function renderDash(){
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <button class="btn btn-sm" onclick="addResourceRow()">add resource</button>
       <button class="btn btn-sm btn-primary" onclick="saveResources()">save resources</button>
+    </div>
+    <div class="section-label" style="margin-top:16px">schedule</div>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">studio days, time slots, and timezone. booking windows use each slot's start/end times.</p>
+    <div style="margin-bottom:8px">
+      <label style="font-size:12px;color:var(--ink3)">timezone</label>
+      <input type="text" id="schedule-timezone" value="${esc(draftTimezone)}" maxlength="60" style="width:100%;margin-top:4px" placeholder="America/New_York">
+    </div>
+    <div id="schedule-days-list"></div>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="addScheduleDayRow()">add day</button>
+    </div>
+    <div id="schedule-slots-list" style="margin-top:12px"></div>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="addScheduleSlotRow()">add time slot</button>
+      <button class="btn btn-sm btn-primary" onclick="saveSchedule()">save schedule</button>
     </div>
     <div class="section-label" style="margin-top:16px">booking window</div>
     <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">opens 2 hours before each slot starts. closes 1 hour before the slot ends. enforced server-side.</p>
@@ -808,6 +863,7 @@ async function renderDash(){
   </div>`;
   renderRoomSettingsList();
   renderResourceSettingsList();
+  renderScheduleSettingsList();
 }
 
 function renderSecurityLog(){
@@ -935,6 +991,91 @@ async function saveResources(){
   await loadReservations(); await loadWaitlists();
   renderResourceSettingsList(); renderDash(); renderSlots();
 }
+function renderScheduleSettingsList(){
+  const dayEl=document.getElementById('schedule-days-list');
+  const slotEl=document.getElementById('schedule-slots-list');
+  const tzEl=document.getElementById('schedule-timezone');
+  if(tzEl) tzEl.oninput=()=>{ draftTimezone=tzEl.value.trim(); };
+  if(!dayEl||!slotEl) return;
+  const dayOpts=WEEKDAY_OPTIONS.map(w=>`<option value="${w}">${w}</option>`).join('');
+  dayEl.innerHTML=draftScheduleDays.map((d,i)=>`
+    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+      <select class="schedule-day-input" data-idx="${i}">${WEEKDAY_OPTIONS.map(w=>`<option value="${w}"${d.weekday===w?' selected':''}>${w}</option>`).join('')}</select>
+      ${draftScheduleDays.length>1?`<button class="btn btn-sm btn-danger" onclick="removeScheduleDayRow(${i})">remove</button>`:''}
+    </div>`).join('');
+  dayEl.querySelectorAll('.schedule-day-input').forEach(sel=>{
+    sel.onchange=()=>{ draftScheduleDays[+sel.dataset.idx].weekday=sel.value; };
+  });
+  slotEl.innerHTML=draftScheduleSlots.map((s,i)=>`
+    <div style="display:grid;grid-template-columns:1fr 0.6fr 0.6fr 0.6fr auto;gap:8px;margin-bottom:8px;align-items:center">
+      <input type="text" class="schedule-slot-label" data-idx="${i}" value="${esc(s.label)}" maxlength="40" placeholder="label">
+      <input type="number" class="schedule-slot-start" data-idx="${i}" value="${s.start_hour}" min="0" max="23" placeholder="start">
+      <input type="number" class="schedule-slot-end" data-idx="${i}" value="${s.end_hour}" min="1" max="24" placeholder="end">
+      <span class="muted" style="font-size:11px">hrs (24h)</span>
+      ${draftScheduleSlots.length>1?`<button class="btn btn-sm btn-danger" onclick="removeScheduleSlotRow(${i})">remove</button>`:'<span></span>'}
+    </div>`).join('');
+  slotEl.querySelectorAll('.schedule-slot-label').forEach(inp=>{
+    inp.oninput=()=>{ draftScheduleSlots[+inp.dataset.idx].label=inp.value; };
+  });
+  slotEl.querySelectorAll('.schedule-slot-start').forEach(inp=>{
+    inp.oninput=()=>{ draftScheduleSlots[+inp.dataset.idx].start_hour=parseInt(inp.value,10)||0; };
+  });
+  slotEl.querySelectorAll('.schedule-slot-end').forEach(inp=>{
+    inp.oninput=()=>{ draftScheduleSlots[+inp.dataset.idx].end_hour=parseInt(inp.value,10)||0; };
+  });
+}
+function addScheduleDayRow(){
+  if(!requireSession()) return;
+  if(draftScheduleDays.length>=7){ showToast('maximum 7 days'); return; }
+  const unused=WEEKDAY_OPTIONS.find(w=>!draftScheduleDays.some(d=>d.weekday===w))||'Tuesday';
+  draftScheduleDays.push({weekday:unused,sort_order:draftScheduleDays.length});
+  renderScheduleSettingsList();
+}
+function removeScheduleDayRow(i){
+  if(!requireSession()) return;
+  if(draftScheduleDays.length<=1){ showToast('at least one studio day required'); return; }
+  draftScheduleDays.splice(i,1);
+  renderScheduleSettingsList();
+}
+function addScheduleSlotRow(){
+  if(!requireSession()) return;
+  if(draftScheduleSlots.length>=6){ showToast('maximum 6 time slots'); return; }
+  draftScheduleSlots.push({id:'',label:'',start_hour:9,end_hour:13,open_offset_minutes:-120,close_offset_minutes:-60});
+  renderScheduleSettingsList();
+}
+function removeScheduleSlotRow(i){
+  if(!requireSession()) return;
+  if(draftScheduleSlots.length<=1){ showToast('at least one time slot required'); return; }
+  draftScheduleSlots.splice(i,1);
+  renderScheduleSettingsList();
+}
+async function saveSchedule(){
+  if(!requireSession()) return;
+  const tz=document.getElementById('schedule-timezone')?.value.trim()||draftTimezone;
+  const days=draftScheduleDays.map((d,i)=>({weekday:d.weekday,sort_order:i}));
+  const slots=draftScheduleSlots.map((s,i)=>({
+    id:s.id||('slot'+Date.now()+i),
+    label:s.label.trim(),
+    start_hour:parseInt(String(s.start_hour),10),
+    end_hour:parseInt(String(s.end_hour),10),
+    open_offset_minutes:s.open_offset_minutes??-120,
+    close_offset_minutes:s.close_offset_minutes??-60,
+    sort_order:i
+  })).filter(s=>s.label.length>=2);
+  if(!days.length||!slots.length){ showToast('schedule needs at least one day and one slot'); return; }
+  const data=await adminCall('saveSchedule',{timezone:tz,days:JSON.stringify(days),slots:JSON.stringify(slots)});
+  if(!data?.success){ showToast(data?.error||'could not save schedule'); return; }
+  studioTimezone=data.timezone||tz;
+  studioDays=data.days||days;
+  scheduleSlots=(data.slots||slots).map(enrichSlot);
+  draftScheduleDays=studioDays.map(d=>({weekday:d.weekday,sort_order:d.sort_order}));
+  draftScheduleSlots=scheduleSlots.map(s=>({id:s.id,label:s.label,start_hour:s.start_hour,end_hour:s.end_hour,open_offset_minutes:s.open_offset_minutes,close_offset_minutes:s.close_offset_minutes}));
+  draftTimezone=studioTimezone;
+  if(!getDays().includes(currentDay)) currentDay=getDays()[0];
+  logEvent('settings','Schedule updated');
+  showToast('schedule saved');
+  renderScheduleSettingsList(); renderDayTabs(); renderDash(); renderSlots();
+}
 async function generatePinHash(){
   const val=document.getElementById('new-pin').value.trim();
   if(!/^\d{4,6}$/.test(val)){ showToast('pin must be 4–6 digits'); return; }
@@ -1043,6 +1184,20 @@ db.channel('reservations-changes')
     await loadCatalog();
     renderSlots();
     if(instructorToken && Date.now()<instructorExpires) renderDash();
+  })
+  .on('postgres_changes',{event:'*',schema:'public',table:'studio_days'}, async ()=>{
+    await loadSchedule();
+    renderDayTabs(); renderSlots();
+    if(instructorToken && Date.now()<instructorExpires) renderDash();
+  })
+  .on('postgres_changes',{event:'*',schema:'public',table:'schedule_slots'}, async ()=>{
+    await loadSchedule();
+    renderDayTabs(); renderSlots();
+    if(instructorToken && Date.now()<instructorExpires) renderDash();
+  })
+  .on('postgres_changes',{event:'*',schema:'public',table:'studio_settings'}, async ()=>{
+    await loadSchedule();
+    renderSlots();
   })
   .subscribe();
 

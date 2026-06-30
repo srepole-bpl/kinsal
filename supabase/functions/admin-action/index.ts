@@ -9,6 +9,10 @@ import { serviceClient } from "../_shared/db.ts";
 import { verifyInstructorToken } from "../_shared/jwt.ts";
 import { promoteAndNotify } from "../_shared/waitlist.ts";
 import {
+  loadSchedule,
+  parseSchedulePayload,
+} from "../_shared/schedule.ts";
+import {
   maxConcurrentBookingsForResource,
   parseResourcePayload,
   parseRoomPayload,
@@ -371,6 +375,67 @@ Deno.serve(async (req) => {
       .select("id, room_id, label, category, capacity, sort_order")
       .order("sort_order", { ascending: true });
     return json({ success: true, resources: resources || [] });
+  }
+
+  // ── SCHEDULE ─────────────────────────────────────────────────────────────────
+  if (action === "getSchedule") {
+    const schedule = await loadSchedule(db);
+    return json({ success: true, ...schedule });
+  }
+
+  if (action === "saveSchedule") {
+    let daysIn: unknown;
+    let slotsIn: unknown;
+    try {
+      daysIn = JSON.parse(String(body.days || "[]"));
+      slotsIn = JSON.parse(String(body.slots || "[]"));
+    } catch {
+      return json({ success: false, error: "invalid schedule data" }, 400);
+    }
+    const timezone = String(body.timezone || "America/New_York").trim();
+    const parsed = parseSchedulePayload(daysIn, slotsIn, timezone);
+    if (!parsed.ok) return json({ success: false, error: parsed.error }, 400);
+
+    const { schedule } = parsed;
+
+    await db.from("studio_settings").upsert({ id: 1, timezone: schedule.timezone });
+
+    const { data: existingDays } = await db.from("studio_days").select("weekday");
+    const newDaySet = new Set(schedule.days.map((d) => d.weekday));
+    for (const old of existingDays || []) {
+      if (!newDaySet.has(old.weekday)) {
+        await db.from("studio_days").delete().eq("weekday", old.weekday);
+      }
+    }
+    for (const day of schedule.days) {
+      const { error } = await db.from("studio_days").upsert({
+        weekday: day.weekday,
+        sort_order: day.sort_order,
+      });
+      if (error) return json({ success: false, error: "could not save studio days" }, 500);
+    }
+
+    const { data: existingSlots } = await db.from("schedule_slots").select("id");
+    const newSlotSet = new Set(schedule.slots.map((s) => s.id));
+    for (const old of existingSlots || []) {
+      if (!newSlotSet.has(old.id)) {
+        await db.from("schedule_slots").delete().eq("id", old.id);
+      }
+    }
+    for (const slot of schedule.slots) {
+      const { error } = await db.from("schedule_slots").upsert({
+        id: slot.id,
+        label: slot.label,
+        start_hour: slot.start_hour,
+        end_hour: slot.end_hour,
+        open_offset_minutes: slot.open_offset_minutes,
+        close_offset_minutes: slot.close_offset_minutes,
+        sort_order: slot.sort_order,
+      });
+      if (error) return json({ success: false, error: "could not save time slots" }, 500);
+    }
+
+    return json({ success: true, ...schedule });
   }
 
   return json({ success: false, error: "unknown action" }, 400);

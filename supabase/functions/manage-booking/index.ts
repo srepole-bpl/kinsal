@@ -6,43 +6,11 @@
 import { json, preflight } from "../_shared/cors.ts";
 import { serviceClient } from "../_shared/db.ts";
 import { getResource, loadResourceIds, nextFreeSpot } from "../_shared/resources.ts";
+import { isBookingOpen, loadSchedule } from "../_shared/schedule.ts";
 import { promoteAndNotify } from "../_shared/waitlist.ts";
-
-const STUDIO_TZ = "America/New_York";
-const STUDIO_DAYS = ["Tuesday", "Thursday", "Saturday", "Sunday"];
-const SLOTS: Record<string, { start: number; end: number }> = {
-  am: { start: 9, end: 13 },
-  pm: { start: 16, end: 20 },
-};
-const WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function isValidEmail(e: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-}
-
-function studioNow(): { dayIdx: number; minutes: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: STUDIO_TZ,
-    weekday: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date());
-  const wd = parts.find((p) => p.type === "weekday")?.value ?? "";
-  const hh = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
-  const mm = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
-  return { dayIdx: WEEK.indexOf(wd), minutes: hh * 60 + mm };
-}
-
-function withinWindow(day: string, slotId: string): boolean {
-  const sl = SLOTS[slotId];
-  const target = WEEK.indexOf(day);
-  if (!sl || target < 0) return false;
-  const { dayIdx, minutes } = studioNow();
-  if (target !== dayIdx) return false;
-  const openMin = sl.start * 60 - 120;
-  const closeMin = sl.end * 60 - 60;
-  return minutes >= openMin && minutes < closeMin;
 }
 
 async function validSlot(
@@ -51,7 +19,9 @@ async function validSlot(
   slotId: string,
   resourceId: string,
 ): Promise<boolean> {
-  if (!STUDIO_DAYS.includes(day) || !SLOTS[slotId]) return false;
+  const schedule = await loadSchedule(db);
+  if (!schedule.days.some((d) => d.weekday === day)) return false;
+  if (!schedule.slots.some((s) => s.id === slotId)) return false;
   const resourceIds = await loadResourceIds(db);
   return resourceIds.has(resourceId);
 }
@@ -105,7 +75,8 @@ Deno.serve(async (req) => {
   if (!stu) return json({ success: false, error: "unknown student" }, 400);
 
   if (action === "book") {
-    if (!withinWindow(day, slotId)) {
+    const schedule = await loadSchedule(db);
+    if (!isBookingOpen(schedule, day, slotId)) {
       return json({ success: false, error: "booking window is not open" }, 403);
     }
     const { data: dayRes } = await db
