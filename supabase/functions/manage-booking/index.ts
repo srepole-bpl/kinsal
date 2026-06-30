@@ -9,7 +9,7 @@ import {
   loadStudioLimits,
 } from "../_shared/limits.ts";
 import { getActiveBlock, isClosedForWeekday } from "../_shared/blocks.ts";
-import { json, preflight } from "../_shared/cors.ts";
+import { json, preflight, rejectForeignOrigin } from "../_shared/cors.ts";
 import { serviceClient } from "../_shared/db.ts";
 import { sendBookingConfirmation } from "../_shared/email.ts";
 import { getResource, loadResourceIds, nextFreeSpot } from "../_shared/resources.ts";
@@ -34,7 +34,9 @@ async function validSlot(
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return preflight();
+  if (req.method === "OPTIONS") return preflight(req.headers.get("Origin") ?? "");
+  const foreign = rejectForeignOrigin(req);
+  if (foreign) return foreign;
   if (req.method !== "POST") return json({ success: false, error: "method not allowed" }, 405);
 
   let body: Record<string, string>;

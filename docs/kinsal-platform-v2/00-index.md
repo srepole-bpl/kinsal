@@ -1,6 +1,6 @@
 # Feature: Kinsal Platform v2
 
-## Status: In Progress
+## Status: ✅ Complete
 
 ## Quick Links
 
@@ -27,7 +27,7 @@
 | 5b. Roster CSV + limits | [05b-roster-limits.md](./05b-roster-limits.md) | ✅ Complete | `e80ae5d` |
 | 5c. Audit + PIN | [05c-audit-pin.md](./05c-audit-pin.md) | ✅ Complete | `6c749f5` |
 | 6. Communications | [06-communications.md](./06-communications.md) | ✅ Complete | `6e6b3eb` |
-| 7. Polish + security | [07-polish-security.md](./07-polish-security.md) | Pending | — |
+| 7. Polish + security | [07-polish-security.md](./07-polish-security.md) | ✅ Complete | pending |
 
 ## Status Legend
 
@@ -38,7 +38,7 @@
 
 ## Current Context
 
-- Phase 6 **complete and deployed**. Next: **Phase 7** — polish + security ([07-polish-security.md](./07-polish-security.md)).
+- Phase 7 **complete and deployed** — all v2 phases done. CORS locked to the Pages origin, iframe autosize, offline + loading UX, and mobile polish shipped.
 
 ## Architectural Decisions Made
 
@@ -49,7 +49,7 @@
 
 ## Blockers / Open Questions
 
-- [ ] Pixiset exact origin URL for Phase 7 CORS (add when known)
+- [x] ~~Pixiset exact origin URL for Phase 7 CORS~~ — not needed: fetches run from the Pages iframe origin, so CORS only allowlists `https://srepole-bpl.github.io`. Pixiset origin only matters for `postMessage` (currently `'*'`).
 - [x] ~~Supabase Management API for in-app PIN change~~ — use `instructor_secrets` table instead (see implementation-plan Decision 8)
 
 ## Phase 1 split rationale

@@ -16,7 +16,7 @@ import {
   setStoredPinHash,
   verifyPinHash,
 } from "../_shared/pin.ts";
-import { json, preflight } from "../_shared/cors.ts";
+import { json, preflight, rejectForeignOrigin } from "../_shared/cors.ts";
 import { serviceClient } from "../_shared/db.ts";
 import { verifyInstructorToken } from "../_shared/jwt.ts";
 import { promoteAndNotify } from "../_shared/waitlist.ts";
@@ -70,7 +70,9 @@ async function wheelHasBookings(db: any, wheelId: string): Promise<boolean> {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return preflight();
+  if (req.method === "OPTIONS") return preflight(req.headers.get("Origin") ?? "");
+  const foreign = rejectForeignOrigin(req);
+  if (foreign) return foreign;
   if (req.method !== "POST") return json({ success: false, error: "method not allowed" }, 405);
 
   let body: Record<string, string>;

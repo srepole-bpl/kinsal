@@ -3,7 +3,7 @@
 // On success, mints a short-lived signed instructor token. Includes a
 // database-backed lockout so the PIN can't be brute-forced by hammering this
 // endpoint directly (the browser's own lockout is irrelevant to an attacker).
-import { json, preflight } from "../_shared/cors.ts";
+import { json, preflight, rejectForeignOrigin } from "../_shared/cors.ts";
 import { createInstructorToken } from "../_shared/jwt.ts";
 import { serviceClient } from "../_shared/db.ts";
 import { getStoredPinHash, verifyPinHash } from "../_shared/pin.ts";
@@ -14,7 +14,9 @@ const LOCKOUT_MS = 15 * 60 * 1000;
 const TOKEN_TTL_S = 20 * 60;
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return preflight();
+  if (req.method === "OPTIONS") return preflight(req.headers.get("Origin") ?? "");
+  const foreign = rejectForeignOrigin(req);
+  if (foreign) return foreign;
   if (req.method !== "POST") return json({ success: false, error: "method not allowed" }, 405);
 
   let body: { pinHash?: string };

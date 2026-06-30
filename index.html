@@ -110,9 +110,38 @@ input[type=text],input[type=password],input[type=email]{padding:9px 12px;border-
 .booking-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;flex-shrink:0}
 .booking-empty{font-size:12.5px;color:var(--ink3);padding:4px 0}
 @keyframes spin{to{transform:rotate(360deg)}}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,0.45);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;margin-right:7px;vertical-align:-2px}
+.offline-banner{position:fixed;top:0;left:0;right:0;z-index:200;background:var(--red);color:#fff;text-align:center;font-size:12.5px;padding:9px 12px;display:none;letter-spacing:.02em}
+.offline-banner.show{display:block}
+.offline-banner i{margin-right:6px}
+body.has-offline .app{padding-top:3rem}
+.busy-spinner{position:fixed;top:14px;right:14px;z-index:150;width:22px;height:22px;border:2.5px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;display:none}
+.busy-spinner.show{display:block}
+@media (max-width:480px){
+  .app{padding:1.25rem .9rem 2.5rem}
+  .day-tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:5px;scrollbar-width:none}
+  .day-tabs::-webkit-scrollbar{display:none}
+  .day-tab{flex:0 0 auto}
+  .tab-bar{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tab-bar::-webkit-scrollbar{display:none}
+  .tab{flex:0 0 auto;white-space:nowrap}
+  .dash-grid{gap:6px}
+  .metric{padding:.65rem .5rem}
+  .metric-val{font-size:22px}
+  .booking-row{flex-direction:column}
+  .booking-actions{justify-content:flex-start;width:100%}
+  .wheel-slot{flex-wrap:wrap;gap:6px}
+}
+@media (pointer:coarse){
+  .btn{min-height:44px}
+  .btn-sm{min-height:38px}
+  .day-tab,.tab{min-height:40px;display:inline-flex;align-items:center}
+}
 </style>
 </head>
 <body>
+<div id="offline-banner" class="offline-banner" role="alert" aria-live="assertive"><i class="ti ti-cloud-off" aria-hidden="true"></i>you're offline — reconnecting. changes can't be saved right now.</div>
+<div id="busy-spinner" class="busy-spinner" role="status" aria-label="loading"></div>
 <div class="app">
 <div class="toast-container" id="toast-container"></div>
 
@@ -493,6 +522,24 @@ function showToast(msg){
 }
 function showView(id){ document.querySelectorAll('.view').forEach(v=>v.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 
+/* ── LOADING + OFFLINE UX ───────────────────────────────────────────────────
+   A lightweight global busy spinner reflects in-flight edge calls, and an
+   offline banner appears when a request can't reach the server (or the browser
+   reports it is offline) so nothing fails silently. */
+let _busyCount=0;
+function setBusy(on){
+  _busyCount=Math.max(0,_busyCount+(on?1:-1));
+  const el=document.getElementById('busy-spinner');
+  if(el) el.classList.toggle('show',_busyCount>0);
+}
+function showOffline(on){
+  const el=document.getElementById('offline-banner');
+  if(el) el.classList.toggle('show',on);
+  document.body.classList.toggle('has-offline',on);
+}
+window.addEventListener('online',()=>{ showOffline(false); init(); });
+window.addEventListener('offline',()=>showOffline(true));
+
 async function sha256(str){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -502,13 +549,22 @@ async function sha256(str){
    Public call carries only the anon key. Admin call additionally carries the
    signed instructor token, which the server verifies before doing anything. */
 async function edgeCall(fn,payload){
-  const res=await fetch(`${EDGE}/${fn}`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'apikey':SUPABASE_KEY},
-    body:JSON.stringify(payload)
-  });
-  let data={}; try{ data=await res.json(); }catch{}
-  return {status:res.status,data};
+  setBusy(true);
+  try{
+    const res=await fetch(`${EDGE}/${fn}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY,'apikey':SUPABASE_KEY},
+      body:JSON.stringify(payload)
+    });
+    showOffline(false);
+    let data={}; try{ data=await res.json(); }catch{}
+    return {status:res.status,data};
+  }catch(e){
+    showOffline(true);
+    return {status:0,data:{success:false,error:'offline — check your connection'}};
+  }finally{
+    setBusy(false);
+  }
 }
 async function adminCall(action,params={}){
   if(!requireSession()) return null;
@@ -679,10 +735,10 @@ async function lookupStudent(){
   if(isRateLimited('lookup')){ showRateBanner('please wait before trying again'); return; }
   const btn=document.getElementById('lookup-btn');
   btn.innerHTML='<span class="spinner"></span>looking up…'; btn.disabled=true;
-  let data={};
-  try{ ({data}=await edgeCall('manage-booking',{action:'lookup',email:raw})); }
-  catch(e){ showInfoBanner('connection error — try again'); btn.textContent='continue'; btn.disabled=false; return; }
+  let data={},status=0;
+  ({data,status}=await edgeCall('manage-booking',{action:'lookup',email:raw}));
   btn.textContent='continue'; btn.disabled=false;
+  if(status===0){ showInfoBanner('connection error — please try again'); return; }
   if(!data.found){ showInfoBanner('email not found, contact your instructor'); logEvent('login-fail','Email not found'); return; }
   currentStudent=data.student;
   logEvent('login','Student signed in: '+currentStudent.name);
@@ -1750,9 +1806,31 @@ db.channel('reservations-changes')
   })
   .subscribe();
 
+/* ── IFRAME AUTOSIZE ────────────────────────────────────────────────────────
+   The app is embedded in a Pixiset iframe. We post our content height to the
+   parent so it can size the iframe and avoid a nested scrollbar. targetOrigin
+   stays '*' until the exact Pixiset parent origin is known, then tighten it. */
+const PARENT_TARGET_ORIGIN='*';
+let _lastReportedHeight=0;
+function notifyParentHeight(){
+  if(window.parent===window) return;
+  const h=Math.ceil(document.documentElement.scrollHeight);
+  if(Math.abs(h-_lastReportedHeight)<4) return;
+  _lastReportedHeight=h;
+  try{ window.parent.postMessage({type:'kinsal-resize',height:h},PARENT_TARGET_ORIGIN); }catch(e){}
+}
+if('ResizeObserver' in window){
+  const ro=new ResizeObserver(()=>notifyParentHeight());
+  ro.observe(document.body);
+}
+window.addEventListener('load',notifyParentHeight);
+window.addEventListener('resize',notifyParentHeight);
+
 async function init(){
+  if(!navigator.onLine) showOffline(true);
   await loadCatalog();
   await loadStudents();
+  notifyParentHeight();
   logEvent('system','Kinsal loaded');
 }
 init();
