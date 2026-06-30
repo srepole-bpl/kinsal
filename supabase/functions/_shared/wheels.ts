@@ -1,29 +1,12 @@
-export const MAX_WHEELS = 12;
+// Backward-compatible re-exports — prefer resources.ts for new code.
+export {
+  isValidResourceLabel as isValidWheelLabel,
+  loadResourceIds as loadWheelIds,
+  maxConcurrentBookingsForResource,
+  newResourceId as newWheelId,
+  resourceHasBookings,
+  resourceLabelForId as wheelLabelForId,
+  sanitizeResourceLabel as sanitizeWheelLabel,
+} from "./resources.ts";
 
-export function isValidWheelLabel(label: string): boolean {
-  return /^[a-zA-Z0-9\s'\-\.]{2,40}$/.test(label);
-}
-
-export function sanitizeWheelLabel(s: string): string {
-  return String(s).replace(/[<>"'&\/\\;|]/g, "").replace(/\s+/g, " ").trim().slice(0, 40);
-}
-
-export function newWheelId(): string {
-  return "wheel" + Date.now();
-}
-
-// deno-lint-ignore no-explicit-any
-export async function loadWheelIds(db: any): Promise<Set<string>> {
-  const { data } = await db.from("wheels").select("id");
-  return new Set((data || []).map((w: { id: string }) => w.id));
-}
-
-// deno-lint-ignore no-explicit-any
-export async function wheelLabelForId(db: any, wheelId: string): Promise<string> {
-  const { data } = await db
-    .from("wheels")
-    .select("label")
-    .eq("id", wheelId)
-    .maybeSingle();
-  return data?.label ?? wheelId;
-}
+export const MAX_WHEELS = 20;

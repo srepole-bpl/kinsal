@@ -54,7 +54,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-siz
 .badge-open{background:var(--green-light);color:var(--green);border:1px solid rgba(45,110,58,0.2)}
 .badge-full{background:var(--red-light);color:var(--red);border:1px solid rgba(140,44,30,0.18)}
 .badge-locked{background:var(--bg3);color:var(--ink3);border:1px solid var(--border)}
-.wheel-slot{padding:9px 11px;border-radius:8px 9px 8px 9px;border:1px solid var(--border);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.room-header{font-family:var(--font-head);font-size:13px;font-weight:500;color:var(--ink2);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border);letter-spacing:0.02em}
+.category-badge{font-size:10px;padding:2px 7px;border-radius:20px;background:var(--bg3);color:var(--ink3);margin-left:6px;text-transform:lowercase}
+.seat-count{font-size:11px;color:var(--ink3);margin-top:2px}
 .wheel-slot.booked{background:var(--green-light);border-color:rgba(45,110,58,0.25)}
 .wheel-slot.mine{background:var(--blue-light);border-color:rgba(58,114,196,0.3)}
 .wheel-slot.empty{background:var(--bg2)}
@@ -231,14 +233,26 @@ const SLOTS = [
   {id:'am',label:'morning',time:'9:00 am – 1:00 pm',hours:4,start:9,end:13},
   {id:'pm',label:'evening',time:'4:00 pm – 8:00 pm',hours:4,start:16,end:20}
 ];
-const WHEELS_FALLBACK = [{id:'shimpo',label:'Shimpo',sort_order:0},{id:'pacifica',label:'Pacifica',sort_order:1},{id:'bhr',label:'BHR',sort_order:2}];
+const RESOURCES_FALLBACK=[
+  {id:'shimpo',room_id:'main-studio',label:'Shimpo',category:'wheel',capacity:1,sort_order:0},
+  {id:'pacifica',room_id:'main-studio',label:'Pacifica',category:'wheel',capacity:1,sort_order:1},
+  {id:'bhr',room_id:'main-studio',label:'BHR',category:'wheel',capacity:1,sort_order:2}
+];
+const ROOMS_FALLBACK=[{id:'main-studio',label:'Main studio',sort_order:0}];
+const CATEGORY_OPTIONS=[
+  {value:'wheel',label:'Wheel'},
+  {value:'hand_build_table',label:'Hand-building table'},
+  {value:'clay_prep_table',label:'Clay prep table'},
+  {value:'glaze_table',label:'Glaze table'}
+];
 const RATE_LIMIT_MS      = 3000;
 const NOSHOW_RELEASE_MIN = 30;
 const MAX_LOG_ENTRIES    = 100;
 const MAX_NAME_LEN       = 40;
 
 let students=[], reservations={}, waitlists={};
-let wheels=[], wheelMap={}, draftWheels=[];
+let rooms=[], resources=[], resourceMap={}, resourcesByRoom={};
+let draftRooms=[], draftResources=[];
 let roster=[], rosterMap={};
 let noShowTimers={}, countdownIntervals={};
 let currentStudent=null, currentDay=DAYS[0], pendingAction=null;
@@ -246,10 +260,25 @@ let instructorToken=null, instructorExpires=0, sessionTimer=null;
 let pinAttempts=0, pinLockedUntil=0, lastActionTime={}, securityLog=[];
 const bookingWindow=[];
 
-function wheelLabel(id){ return wheelMap[id] || id; }
-function rebuildWheelMap(){ wheelMap={}; wheels.forEach(w=>{ wheelMap[w.id]=w.label; }); }
-function eachWheelSlot(cb){ DAYS.forEach(d=>SLOTS.forEach(s=>wheels.forEach(w=>cb(d,s,w)))); }
-function sanitizeWheelName(s){ return String(s).replace(/[<>"'&\/\\;|]/g,'').replace(/\s+/g,' ').trim().slice(0,40); }
+function categoryLabel(c){
+  return {wheel:'wheel',hand_build_table:'hand building',clay_prep_table:'clay prep',glaze_table:'glaze'}[c]||c;
+}
+function resourceLabel(id){ return resourceMap[id]?.label||id; }
+function rebuildResourceMap(){ resourceMap={}; resources.forEach(r=>{ resourceMap[r.id]=r; }); }
+function rebuildResourcesByRoom(){
+  resourcesByRoom={};
+  rooms.forEach(room=>{ resourcesByRoom[room.id]=[]; });
+  resources.forEach(r=>{
+    if(!resourcesByRoom[r.room_id]) resourcesByRoom[r.room_id]=[];
+    resourcesByRoom[r.room_id].push(r);
+  });
+}
+function eachResourceSlot(cb){ DAYS.forEach(d=>SLOTS.forEach(s=>resources.forEach(r=>cb(d,s,r)))); }
+function sanitizeResourceName(s){ return String(s).replace(/[<>"'&\/\\;|]/g,'').replace(/\s+/g,' ').trim().slice(0,40); }
+function sanitizeRoomName(s){ return sanitizeResourceName(s); }
+function bookedCount(k){ return (reservations[k]||[]).length; }
+function isSlotFull(k,capacity){ return bookedCount(k)>=capacity; }
+function isBookedByMe(k){ return (reservations[k]||[]).includes(currentStudent?.id); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function sanitize(s){ return String(s).replace(/[<>"'&\/\\;`]/g,'').replace(/\s+/g,' ').trim().slice(0,MAX_NAME_LEN); }
 function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
@@ -321,15 +350,34 @@ async function adminCall(action,params={}){
 }
 
 /* ── DATA LOADERS (reads only; RLS allows anon SELECT) ─────────────────────── */
-async function loadWheels(){
-  const {data,error}=await db.from('wheels').select('id,label,sort_order').order('sort_order');
+async function loadRooms(){
+  const {data,error}=await db.from('rooms').select('id,label,sort_order').order('sort_order');
   if(error||!data||data.length===0){
-    wheels=WHEELS_FALLBACK.slice();
-    logEvent('db-error',error?'loadWheels: '+error.message:'wheels empty — using defaults');
+    rooms=ROOMS_FALLBACK.slice();
+    if(error) logEvent('db-error','loadRooms: '+error.message);
   } else {
-    wheels=data;
+    rooms=data;
   }
-  rebuildWheelMap();
+}
+async function loadResources(){
+  const {data,error}=await db.from('resources').select('id,room_id,label,category,capacity,sort_order').order('sort_order');
+  if(error||!data||data.length===0){
+    const {data:wData}=await db.from('wheels').select('id,label,sort_order').order('sort_order');
+    if(wData&&wData.length>0){
+      resources=wData.map(w=>({id:w.id,room_id:'main-studio',label:w.label,category:'wheel',capacity:1,sort_order:w.sort_order}));
+    } else {
+      resources=RESOURCES_FALLBACK.slice();
+      if(error) logEvent('db-error','loadResources: '+error.message);
+    }
+  } else {
+    resources=data;
+  }
+  rebuildResourceMap();
+  rebuildResourcesByRoom();
+}
+async function loadCatalog(){
+  await loadRooms();
+  await loadResources();
 }
 async function loadStudents(){
   const {data,error}=await db.from('student_directory').select('*').order('name');
@@ -340,14 +388,17 @@ async function loadReservations(){
   const {data,error}=await db.from('reservations').select('*');
   if(error){ logEvent('db-error','loadReservations: '+error.message); return; }
   reservations={};
-  eachWheelSlot((d,s,w)=>{ reservations[key(d,s.id,w.id)]=null; });
-  (data||[]).forEach(r=>{ reservations[r.key]=r.student_id; });
+  eachResourceSlot((d,s,r)=>{ reservations[key(d,s.id,r.id)]=[]; });
+  (data||[]).forEach(r=>{
+    if(!reservations[r.key]) reservations[r.key]=[];
+    reservations[r.key].push(r.student_id);
+  });
 }
 async function loadWaitlists(){
   const {data,error}=await db.from('waitlists').select('*').order('position');
   if(error){ logEvent('db-error','loadWaitlists: '+error.message); return; }
   waitlists={};
-  eachWheelSlot((d,s,w)=>{ waitlists[key(d,s.id,w.id)]=[]; });
+  eachResourceSlot((d,s,r)=>{ waitlists[key(d,s.id,r.id)]=[]; });
   (data||[]).forEach(r=>{ if(waitlists[r.key]) waitlists[r.key].push(r.student_id); });
 }
 async function loadRoster(){
@@ -386,7 +437,7 @@ async function lookupStudent(){
   await enterStudentView();
 }
 async function enterStudentView(){
-  await loadWheels(); await loadStudents(); await loadReservations(); await loadWaitlists();
+  await loadCatalog(); await loadStudents(); await loadReservations(); await loadWaitlists();
   document.getElementById('student-greeting').textContent='welcome, '+currentStudent.name.split(' ')[0].toLowerCase();
   document.getElementById('student-email-display').textContent=currentStudent.email;
   document.getElementById('student-avatar').textContent=currentStudent.name.split(' ').map(n=>n[0]).join('').toUpperCase();
@@ -423,56 +474,57 @@ function canBookClientSide(day,slotId){
   return diffHrs<=2&&diffHrs>0;
 }
 function studentHasBookingToday(day){
-  return SLOTS.some(s=>wheels.some(w=>reservations[key(day,s.id,w.id)]===currentStudent?.id));
+  return SLOTS.some(s=>resources.some(r=>isBookedByMe(key(day,s.id,r.id))));
 }
 
-async function bookSlot(day,slotId,wheel){
+async function bookSlot(day,slotId,resourceId){
   if(!currentStudent){ showRateBanner('please sign in first',true); return; }
   if(isRateLimited('book')){ showRateBanner('please wait before booking again',true); return; }
   if(isTooManyBookings()){ showRateBanner('too many attempts — please wait',true); logEvent('rate-limit','Booking rate limit hit'); return; }
   if(!canBookClientSide(day,slotId)){ showRateBanner('booking window not open yet',true); return; }
   if(studentHasBookingToday(day)){ showRateBanner('you already have a reservation today',true); return; }
-  const k=key(day,slotId,wheel);
-  if(reservations[k]){ showRateBanner('that slot was just taken',true); return; }
+  const k=key(day,slotId,resourceId);
+  const res=resourceMap[resourceId];
+  if(isSlotFull(k,res?.capacity||1)){ showRateBanner('that slot was just taken',true); return; }
   const sl=SLOTS.find(s=>s.id===slotId);
   pendingAction=async()=>{
-    const {data}=await edgeCall('manage-booking',{action:'book',studentId:currentStudent.id,day,slotId,wheel});
+    const {data}=await edgeCall('manage-booking',{action:'book',studentId:currentStudent.id,day,slotId,resourceId});
     if(!data.success){ showRateBanner(data.error||'booking failed',true); logEvent('booking-fail',data.error); await loadReservations(); renderSlots(); return; }
-    logEvent('booking',`${currentStudent.name} reserved ${wheelLabel(wheel)} · ${day} ${sl?.label}`);
+    logEvent('booking',`${currentStudent.name} reserved ${resourceLabel(resourceId)} · ${day} ${sl?.label}`);
     await loadReservations(); await refreshStudentStats(); renderSlots();
   };
-  openModal('confirm reservation',`reserve ${wheelLabel(wheel)} for the ${sl?.label} slot (${sl?.time}) on ${day}?`,'confirm');
+  openModal('confirm reservation',`reserve ${resourceLabel(resourceId)} for the ${sl?.label} slot (${sl?.time}) on ${day}?`,'confirm');
 }
 
-async function cancelRes(day,slotId,wheel){
+async function cancelRes(day,slotId,resourceId){
   if(isRateLimited('cancel')){ showRateBanner('please wait before cancelling',true); return; }
-  const k=key(day,slotId,wheel);
-  if(reservations[k]!==currentStudent?.id){ logEvent('tamper-attempt','Cancel on unowned slot'); showRateBanner('that reservation is not yours',true); return; }
+  const k=key(day,slotId,resourceId);
+  if(!isBookedByMe(k)){ logEvent('tamper-attempt','Cancel on unowned slot'); showRateBanner('that reservation is not yours',true); return; }
   pendingAction=async()=>{
-    const {data}=await edgeCall('manage-booking',{action:'cancel',studentId:currentStudent.id,day,slotId,wheel});
+    const {data}=await edgeCall('manage-booking',{action:'cancel',studentId:currentStudent.id,day,slotId,resourceId});
     if(!data.success){ showRateBanner(data.error||'cancel failed',true); return; }
     clearInterval(countdownIntervals[k]); delete countdownIntervals[k]; delete noShowTimers[k];
-    logEvent('cancel',`${currentStudent.name} cancelled ${wheelLabel(wheel)} · ${day} ${slotId}`);
+    logEvent('cancel',`${currentStudent.name} cancelled ${resourceLabel(resourceId)} · ${day} ${slotId}`);
     await loadReservations(); await loadWaitlists(); await refreshStudentStats(); renderSlots();
   };
   openModal('cancel reservation','are you sure you want to cancel your reservation?','yes, cancel');
 }
 
-async function joinWaitlist(day,slotId,wheel){
+async function joinWaitlist(day,slotId,resourceId){
   if(!currentStudent) return;
   if(isRateLimited('waitlist')){ showRateBanner('please wait',true); return; }
-  const k=key(day,slotId,wheel);
+  const k=key(day,slotId,resourceId);
   if((waitlists[k]||[]).includes(currentStudent.id)){ showRateBanner('already on this waitlist',true); return; }
-  const {data}=await edgeCall('manage-booking',{action:'join_waitlist',studentId:currentStudent.id,day,slotId,wheel});
+  const {data}=await edgeCall('manage-booking',{action:'join_waitlist',studentId:currentStudent.id,day,slotId,resourceId});
   if(!data.success){ showRateBanner(data.error||'could not join waitlist',true); return; }
   logEvent('waitlist',`${currentStudent.name} joined waitlist · ${k}`);
   await loadWaitlists(); renderSlots();
 }
 
 /* ── NO-SHOW (instructor marks it; SERVER cron releases it after 30 min) ──── */
-async function triggerNoShow(k){
+async function triggerNoShow(k,studentId){
   if(!requireSession()) return;
-  const data=await adminCall('noShow',{key:k});
+  const data=await adminCall('noShow',{key:k,studentId:studentId||''});
   if(!data?.success){ showToast(data?.error||'could not mark no-show'); return; }
   logEvent('no-show','Marked no-show · '+k);
   noShowTimers[k]={end:Date.now()+NOSHOW_RELEASE_MIN*60000}; // cosmetic countdown only
@@ -543,7 +595,7 @@ async function checkPin(val){
 async function startInstructorSession(){
   clearInterval(sessionTimer);
   sessionTimer=setInterval(tickSession,30000);
-  await loadWheels(); await loadStudents(); await loadReservations(); await loadWaitlists(); await loadRoster();
+  await loadCatalog(); await loadStudents(); await loadReservations(); await loadWaitlists(); await loadRoster();
   showView('instructor-view'); renderDash(); updateSessionBar();
 }
 function tickSession(){
@@ -573,38 +625,54 @@ function renderSlots(){
   let html='';
   SLOTS.forEach(s=>{
     const bookable=canBookClientSide(currentDay,s.id);
-    const allFull=wheels.every(w=>reservations[key(currentDay,s.id,w.id)]!==null);
+    const allFull=resources.every(r=>isSlotFull(key(currentDay,s.id,r.id),r.capacity));
     const badge=bookable?(allFull?'<span class="slot-label badge-full">full</span>':'<span class="slot-label badge-open">open</span>'):'<span class="slot-label badge-locked">opens 2 hrs before</span>';
     html+=`<div class="slot-card"><div class="slot-header"><span class="slot-time">${s.label} · ${s.time}</span>${badge}</div>`;
-    wheels.forEach(w=>{
-      const k=key(currentDay,s.id,w.id),booked=reservations[k],wl=waitlists[k]||[];
-      const isMe=booked===currentStudent?.id,inNS=noShowTimers[k]!==undefined;
-      if(booked){
-        html+=`<div class="wheel-slot ${isMe?'mine':'booked'}">
-          <div><div class="student-name">${esc(nameFor(booked))}</div><div class="muted">${esc(w.label)}</div></div>
-          <div style="display:flex;gap:4px;align-items:center">
-            ${inNS?`<span class="countdown" id="cd-${k}">releasing soon</span>`:''}
-            ${isMe?`<button class="btn btn-sm btn-danger" onclick="cancelRes('${esc(currentDay)}','${esc(s.id)}','${esc(w.id)}')">cancel</button>`:''}
-          </div>
-        </div>`;
-      } else {
-        let action='';
-        if(bookable&&currentStudent){
-          action=studentHasBookingToday(currentDay)
-            ?'<span class="muted" style="font-size:11px">1/day limit</span>'
-            :`<button class="btn btn-sm btn-primary" onclick="bookSlot('${esc(currentDay)}','${esc(s.id)}','${esc(w.id)}')">reserve</button>`;
+    rooms.forEach(room=>{
+      const roomResources=resourcesByRoom[room.id]||[];
+      if(!roomResources.length) return;
+      html+=`<div class="room-header">${esc(room.label)}</div>`;
+      roomResources.forEach(r=>{
+        const k=key(currentDay,s.id,r.id),booked=reservations[k]||[],wl=waitlists[k]||[];
+        const count=booked.length,cap=r.capacity,isMe=isBookedByMe(k),inNS=noShowTimers[k]!==undefined;
+        const cat=categoryLabel(r.category);
+        if(count>0){
+          booked.forEach(bId=>{
+            const rowIsMe=bId===currentStudent?.id;
+            html+=`<div class="wheel-slot ${rowIsMe?'mine':'booked'}">
+              <div><div class="student-name">${esc(nameFor(bId))}</div>
+              <div class="muted">${esc(r.label)} <span class="category-badge">${esc(cat)}</span>${cap>1?`<div class="seat-count">${count} of ${cap} seats</div>`:''}</div></div>
+              <div style="display:flex;gap:4px;align-items:center">
+                ${inNS&&rowIsMe?`<span class="countdown" id="cd-${k}">releasing soon</span>`:''}
+                ${rowIsMe?`<button class="btn btn-sm btn-danger" onclick="cancelRes('${esc(currentDay)}','${esc(s.id)}','${esc(r.id)}')">cancel</button>`:''}
+              </div>
+            </div>`;
+          });
+        } else {
+          let action='';
+          if(bookable&&currentStudent){
+            action=studentHasBookingToday(currentDay)
+              ?'<span class="muted" style="font-size:11px">1/day limit</span>'
+              :`<button class="btn btn-sm btn-primary" onclick="bookSlot('${esc(currentDay)}','${esc(s.id)}','${esc(r.id)}')">reserve</button>`;
+          }
+          html+=`<div class="wheel-slot empty"><div><div class="student-name" style="color:var(--ink3)">available</div>
+            <div class="muted">${esc(r.label)} <span class="category-badge">${esc(cat)}</span>${cap>1?`<div class="seat-count">0 of ${cap} seats</div>`:''}</div></div>${action}</div>`;
         }
-        html+=`<div class="wheel-slot empty"><div><div class="student-name" style="color:var(--ink3)">available</div><div class="muted">${esc(w.label)}</div></div>${action}</div>`;
-      }
-      const pos=wl.indexOf(currentStudent?.id);
-      const slotFull=reservations[k]!==null;
-      const canJoin=currentStudent&&bookable&&!studentHasBookingToday(currentDay)&&pos===-1&&slotFull;
-      if(wl.length>0||canJoin){
-        html+=`<div style="font-size:11.5px;color:var(--ink3);padding:4px 0 6px 4px">
-          <i class="ti ti-list" aria-hidden="true"></i> ${wl.length>0?`waitlist: ${wl.length}`:'slot full'}${pos>-1?` <strong>· you are #${pos+1}</strong>`:''}
-          ${canJoin?`<button class="btn btn-sm" style="margin-left:8px;font-size:11px;padding:3px 8px" onclick="joinWaitlist('${esc(currentDay)}','${esc(s.id)}','${esc(w.id)}')">join waitlist</button>`:''}
-      </div>`;
-}
+        if(count>0&&count<cap&&bookable&&currentStudent&&!studentHasBookingToday(currentDay)&&!isMe){
+          html+=`<div style="font-size:11.5px;color:var(--ink3);padding:2px 0 4px 4px">
+            ${count} of ${cap} seats · <button class="btn btn-sm" style="margin-left:4px;font-size:11px;padding:3px 8px" onclick="bookSlot('${esc(currentDay)}','${esc(s.id)}','${esc(r.id)}')">reserve</button>
+          </div>`;
+        }
+        const pos=wl.indexOf(currentStudent?.id);
+        const slotFull=isSlotFull(k,cap);
+        const canJoin=currentStudent&&bookable&&!studentHasBookingToday(currentDay)&&pos===-1&&slotFull;
+        if(wl.length>0||canJoin){
+          html+=`<div style="font-size:11.5px;color:var(--ink3);padding:4px 0 6px 4px">
+            <i class="ti ti-list" aria-hidden="true"></i> ${wl.length>0?`waitlist: ${wl.length}`:'slot full'}${pos>-1?` <strong>· you are #${pos+1}</strong>`:''}
+            ${canJoin?`<button class="btn btn-sm" style="margin-left:8px;font-size:11px;padding:3px 8px" onclick="joinWaitlist('${esc(currentDay)}','${esc(s.id)}','${esc(r.id)}')">join waitlist</button>`:''}
+          </div>`;
+        }
+      });
     });
     html+='</div>';
   });
@@ -616,9 +684,10 @@ function renderSlots(){
 async function renderDash(){
   if(!requireSession()) return;
   let total=0,booked=0,wlCount=0;
-  eachWheelSlot((d,s,w)=>{
-    total++; if(reservations[key(d,s.id,w.id)]!==null) booked++;
-    wlCount+=(waitlists[key(d,s.id,w.id)]||[]).length;
+  eachResourceSlot((d,s,r)=>{
+    total++;
+    if((reservations[key(d,s.id,r.id)]||[]).length>0) booked++;
+    wlCount+=(waitlists[key(d,s.id,r.id)]||[]).length;
   });
   document.getElementById('dash-metrics').innerHTML=`
     <div class="metric"><div class="metric-val">${booked}</div><div class="metric-label">booked this week</div></div>
@@ -628,29 +697,46 @@ async function renderDash(){
   let todayHtml='';
   DAYS.forEach(d=>{
     todayHtml+=`<div class="section-label">${esc(d)}</div>`;
-    SLOTS.forEach(s=>wheels.forEach(w=>{
-      const k=key(d,s.id,w.id),bId=reservations[k];
-      const wl=waitlists[k]||[],isNS=noShowTimers[k]!==undefined;
-      const nm=bId?nameFor(bId):null;
-      todayHtml+=`<div class="card" style="margin-bottom:8px">
-        <div class="flex-between" style="margin-bottom:6px">
-          <span style="font-size:13px;font-weight:500">${esc(w.label)} · ${esc(s.label)}</span>
-          <span style="font-size:11.5px;color:var(--ink3)">${esc(s.time)}</span>
-        </div>
-        ${bId?`<div class="flex-between">
-          <div style="display:flex;align-items:center;gap:8px">
-            <div class="avatar">${esc((nm||'?').split(' ').map(n=>n[0]).join(''))}</div>
-            <div><div class="student-name">${esc(nm)}</div><div class="muted">${esc(emailFor(bId))}</div></div>
-            ${isNS?`<span class="countdown" id="cd-${k}">releasing...</span>`:''}
-          </div>
-          <div style="display:flex;gap:6px">
-            ${!isNS?`<button class="btn btn-sm" onclick="triggerNoShow('${esc(k)}')">mark no-show</button>`:''}
-            <button class="btn btn-sm btn-danger" onclick="adminCancel('${esc(k)}')">cancel</button>
-          </div>
-        </div>`:`<span class="muted">available</span>`}
-        ${wl.length?`<div class="muted" style="margin-top:6px;font-size:11.5px"><i class="ti ti-list" aria-hidden="true"></i> waitlist: ${wl.map(id=>esc(nameFor(id))).join(', ')}</div>`:''}
-      </div>`;
-    }));
+    rooms.forEach(room=>{
+      const roomResources=resourcesByRoom[room.id]||[];
+      if(!roomResources.length) return;
+      todayHtml+=`<div class="room-header">${esc(room.label)}</div>`;
+      SLOTS.forEach(s=>roomResources.forEach(r=>{
+        const k=key(d,s.id,r.id),booked=reservations[k]||[];
+        const wl=waitlists[k]||[],isNS=noShowTimers[k]!==undefined;
+        const cat=categoryLabel(r.category);
+        if(booked.length===0){
+          todayHtml+=`<div class="card" style="margin-bottom:8px">
+            <div class="flex-between"><span style="font-size:13px;font-weight:500">${esc(r.label)} · ${esc(cat)} · ${esc(s.label)}</span>
+            <span style="font-size:11.5px;color:var(--ink3)">${esc(s.time)}</span></div>
+            <span class="muted">available · 0 of ${r.capacity} seats</span>
+            ${wl.length?`<div class="muted" style="margin-top:6px;font-size:11.5px"><i class="ti ti-list"></i> waitlist: ${wl.map(id=>esc(nameFor(id))).join(', ')}</div>`:''}
+          </div>`;
+        } else {
+          booked.forEach(bId=>{
+            const nm=nameFor(bId);
+            todayHtml+=`<div class="card" style="margin-bottom:8px">
+              <div class="flex-between" style="margin-bottom:6px">
+                <span style="font-size:13px;font-weight:500">${esc(r.label)} · ${esc(cat)} · ${esc(s.label)}</span>
+                <span style="font-size:11.5px;color:var(--ink3)">${esc(s.time)}</span>
+              </div>
+              <div class="flex-between">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div class="avatar">${esc((nm||'?').split(' ').map(n=>n[0]).join(''))}</div>
+                  <div><div class="student-name">${esc(nm)}</div><div class="muted">${esc(emailFor(bId))}${r.capacity>1?` · ${booked.length} of ${r.capacity} seats`:''}</div></div>
+                  ${isNS?`<span class="countdown" id="cd-${k}">releasing...</span>`:''}
+                </div>
+                <div style="display:flex;gap:6px">
+                  ${!isNS?`<button class="btn btn-sm" onclick="triggerNoShow('${esc(k)}','${esc(bId)}')">mark no-show</button>`:''}
+                  <button class="btn btn-sm btn-danger" onclick="adminCancel('${esc(k)}','${esc(bId)}')">cancel</button>
+                </div>
+              </div>
+              ${wl.length?`<div class="muted" style="margin-top:6px;font-size:11.5px"><i class="ti ti-list"></i> waitlist: ${wl.map(id=>esc(nameFor(id))).join(', ')}</div>`:''}
+            </div>`;
+          });
+        }
+      }));
+    });
   });
   document.getElementById('dash-today').innerHTML=todayHtml;
   restartCountdownDisplays();
@@ -680,17 +766,25 @@ async function renderDash(){
     ?'<p class="muted">no no-shows recorded.</p>'
     :nsData.map(ns=>{
         const parts=ns.key.split('|');
-        return `<div class="no-show-row"><i class="ti ti-alert-triangle" style="color:var(--amber)" aria-hidden="true"></i><span><strong>${esc(nameFor(ns.student_id))}</strong> · ${esc(parts[0])} ${esc(parts[1])} · ${esc(wheelLabel(parts[2]||''))} · ${new Date(ns.logged_at).toLocaleString()}</span></div>`;
+        return `<div class="no-show-row"><i class="ti ti-alert-triangle" style="color:var(--amber)" aria-hidden="true"></i><span><strong>${esc(nameFor(ns.student_id))}</strong> · ${esc(parts[0])} ${esc(parts[1])} · ${esc(resourceLabel(parts[2]||''))} · ${new Date(ns.logged_at).toLocaleString()}</span></div>`;
       }).join('');
 
-  draftWheels=wheels.map(w=>({id:w.id,label:w.label}));
+  draftRooms=rooms.map(r=>({id:r.id,label:r.label}));
+  draftResources=resources.map(r=>({id:r.id,room_id:r.room_id,label:r.label,category:r.category,capacity:r.capacity}));
   document.getElementById('dash-settings').innerHTML=`<div class="card">
-    <div class="section-label">wheels</div>
-    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">rename wheels or add new ones. changes appear on the booking grid after saving.</p>
-    <div id="wheel-settings-list"></div>
+    <div class="section-label">rooms</div>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">custom room names for grouping resources on the booking grid.</p>
+    <div id="room-settings-list"></div>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="addWheelRow()">add wheel</button>
-      <button class="btn btn-sm btn-primary" onclick="saveWheels()">save wheels</button>
+      <button class="btn btn-sm" onclick="addRoomRow()">add room</button>
+      <button class="btn btn-sm btn-primary" onclick="saveRooms()">save rooms</button>
+    </div>
+    <div class="section-label" style="margin-top:16px">resources</div>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">wheels (1 seat) and tables (2–5 seats). set category and room for each.</p>
+    <div id="resource-settings-list"></div>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="addResourceRow()">add resource</button>
+      <button class="btn btn-sm btn-primary" onclick="saveResources()">save resources</button>
     </div>
     <div class="section-label" style="margin-top:16px">booking window</div>
     <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">opens 2 hours before each slot starts. closes 1 hour before the slot ends. enforced server-side.</p>
@@ -712,7 +806,8 @@ async function renderDash(){
     <div class="section-label" style="margin-top:16px">manual weekly reset</div>
     <button class="btn btn-sm btn-danger" onclick="manualReset()">clear all reservations</button>
   </div>`;
-  renderWheelSettingsList();
+  renderRoomSettingsList();
+  renderResourceSettingsList();
 }
 
 function renderSecurityLog(){
@@ -734,43 +829,111 @@ function exportLog(){
   const csv=['time,isoTime,type,detail',...securityLog.map(e=>`"${e.time}","${e.isoTime}","${e.type}","${e.detail}"`)].join('\n');
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='kinsal-log.csv'; a.click();
 }
-function renderWheelSettingsList(){
-  const el=document.getElementById('wheel-settings-list');
+function renderRoomSettingsList(){
+  const el=document.getElementById('room-settings-list');
   if(!el) return;
-  el.innerHTML=draftWheels.map((w,i)=>`
+  el.innerHTML=draftRooms.map((r,i)=>`
     <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
-      <input type="text" class="wheel-label-input" data-idx="${i}" value="${esc(w.label)}" maxlength="40" placeholder="wheel name" style="flex:1">
-      ${draftWheels.length>1?`<button class="btn btn-sm btn-danger" onclick="removeWheelRow(${i})">remove</button>`:''}
+      <input type="text" class="room-label-input" data-idx="${i}" value="${esc(r.label)}" maxlength="40" placeholder="room name" style="flex:1">
+      ${draftRooms.length>1?`<button class="btn btn-sm btn-danger" onclick="removeRoomRow(${i})">remove</button>`:''}
     </div>`).join('');
-  el.querySelectorAll('.wheel-label-input').forEach(inp=>{
-    inp.oninput=()=>{ draftWheels[+inp.dataset.idx].label=inp.value; };
+  el.querySelectorAll('.room-label-input').forEach(inp=>{
+    inp.oninput=()=>{ draftRooms[+inp.dataset.idx].label=inp.value; };
   });
 }
-function addWheelRow(){
+function addRoomRow(){
   if(!requireSession()) return;
-  if(draftWheels.length>=12){ showToast('maximum 12 wheels'); return; }
-  draftWheels.push({id:'',label:''});
-  renderWheelSettingsList();
+  if(draftRooms.length>=10){ showToast('maximum 10 rooms'); return; }
+  draftRooms.push({id:'',label:''});
+  renderRoomSettingsList();
 }
-function removeWheelRow(i){
+function removeRoomRow(i){
   if(!requireSession()) return;
-  if(draftWheels.length<=1){ showToast('at least one wheel required'); return; }
-  draftWheels.splice(i,1);
-  renderWheelSettingsList();
+  if(draftRooms.length<=1){ showToast('at least one room required'); return; }
+  draftRooms.splice(i,1);
+  renderRoomSettingsList();
 }
-async function saveWheels(){
+async function saveRooms(){
   if(!requireSession()) return;
-  const payload=draftWheels.map(w=>({id:w.id||'',label:sanitizeWheelName(w.label)})).filter(w=>w.label.length>=2);
-  if(payload.length===0){ showToast('enter at least one valid wheel name'); return; }
-  const data=await adminCall('saveWheels',{wheels:JSON.stringify(payload)});
-  if(!data?.success){ showToast(data?.error||'could not save wheels'); return; }
-  wheels=data.wheels||[];
-  rebuildWheelMap();
-  draftWheels=wheels.map(w=>({id:w.id,label:w.label}));
-  logEvent('settings','Wheels updated');
-  showToast('wheels saved');
+  const payload=draftRooms.map(r=>({id:r.id||'',label:sanitizeRoomName(r.label)})).filter(r=>r.label.length>=2);
+  if(payload.length===0){ showToast('enter at least one valid room name'); return; }
+  const data=await adminCall('saveRooms',{rooms:JSON.stringify(payload)});
+  if(!data?.success){ showToast(data?.error||'could not save rooms'); return; }
+  rooms=data.rooms||[];
+  draftRooms=rooms.map(r=>({id:r.id,label:r.label}));
+  logEvent('settings','Rooms updated');
+  showToast('rooms saved');
+  renderRoomSettingsList(); renderDash(); renderSlots();
+}
+function renderResourceSettingsList(){
+  const el=document.getElementById('resource-settings-list');
+  if(!el) return;
+  const roomOptions=draftRooms.map(r=>`<option value="${esc(r.id)}">${esc(r.label||'new room')}</option>`).join('');
+  el.innerHTML=draftResources.map((r,i)=>{
+    const isWheel=r.category==='wheel';
+    const seats=[2,3,4,5].map(n=>`<option value="${n}"${r.capacity==n?' selected':''}>${n}</option>`).join('');
+    const catOptions=CATEGORY_OPTIONS.map(c=>`<option value="${c.value}"${r.category===c.value?' selected':''}>${esc(c.label)}</option>`).join('');
+    const roomOpts=draftRooms.map(room=>`<option value="${esc(room.id)}"${r.room_id===room.id?' selected':''}>${esc(room.label||'new room')}</option>`).join('');
+    return `<div style="display:grid;grid-template-columns:1fr 1.2fr 0.7fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center">
+      <input type="text" class="resource-label-input" data-idx="${i}" value="${esc(r.label)}" maxlength="40" placeholder="name">
+      <select class="resource-category-input" data-idx="${i}">${catOptions}</select>
+      <select class="resource-seats-input" data-idx="${i}" ${isWheel?'disabled':''}>${isWheel?'<option value="1">1</option>':seats}</select>
+      <select class="resource-room-input" data-idx="${i}">${roomOpts}</select>
+      ${draftResources.length>1?`<button class="btn btn-sm btn-danger" onclick="removeResourceRow(${i})">remove</button>`:'<span></span>'}
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.resource-label-input').forEach(inp=>{
+    inp.oninput=()=>{ draftResources[+inp.dataset.idx].label=inp.value; };
+  });
+  el.querySelectorAll('.resource-category-input').forEach(sel=>{
+    sel.onchange=()=>{
+      const idx=+sel.dataset.idx;
+      draftResources[idx].category=sel.value;
+      if(sel.value==='wheel') draftResources[idx].capacity=1;
+      else if(draftResources[idx].capacity===1) draftResources[idx].capacity=4;
+      renderResourceSettingsList();
+    };
+  });
+  el.querySelectorAll('.resource-seats-input').forEach(sel=>{
+    sel.onchange=()=>{ draftResources[+sel.dataset.idx].capacity=parseInt(sel.value,10); };
+  });
+  el.querySelectorAll('.resource-room-input').forEach(sel=>{
+    sel.onchange=()=>{ draftResources[+sel.dataset.idx].room_id=sel.value; };
+  });
+}
+function addResourceRow(){
+  if(!requireSession()) return;
+  if(draftResources.length>=20){ showToast('maximum 20 resources'); return; }
+  const defaultRoom=draftRooms[0]?.id||'main-studio';
+  draftResources.push({id:'',room_id:defaultRoom,label:'',category:'wheel',capacity:1});
+  renderResourceSettingsList();
+}
+function removeResourceRow(i){
+  if(!requireSession()) return;
+  if(draftResources.length<=1){ showToast('at least one resource required'); return; }
+  draftResources.splice(i,1);
+  renderResourceSettingsList();
+}
+async function saveResources(){
+  if(!requireSession()) return;
+  const payload=draftResources.map(r=>({
+    id:r.id||'',
+    room_id:r.room_id||draftRooms[0]?.id||'main-studio',
+    label:sanitizeResourceName(r.label),
+    category:r.category||'wheel',
+    capacity:r.category==='wheel'?1:parseInt(String(r.capacity||4),10)
+  })).filter(r=>r.label.length>=2);
+  if(payload.length===0){ showToast('enter at least one valid resource name'); return; }
+  const data=await adminCall('saveResources',{resources:JSON.stringify(payload)});
+  if(!data?.success){ showToast(data?.error||'could not save resources'); return; }
+  resources=data.resources||[];
+  rebuildResourceMap();
+  rebuildResourcesByRoom();
+  draftResources=resources.map(r=>({id:r.id,room_id:r.room_id,label:r.label,category:r.category,capacity:r.capacity}));
+  logEvent('settings','Resources updated');
+  showToast('resources saved');
   await loadReservations(); await loadWaitlists();
-  renderWheelSettingsList(); renderDash(); renderSlots();
+  renderResourceSettingsList(); renderDash(); renderSlots();
 }
 async function generatePinHash(){
   const val=document.getElementById('new-pin').value.trim();
@@ -783,9 +946,11 @@ async function generatePinHash(){
 }
 
 /* ── INSTRUCTOR WRITES — all go through admin-action (token verified) ───────── */
-async function adminCancel(k){
+async function adminCancel(k,studentId){
   if(!requireSession()) return;
-  const data=await adminCall('adminCancel',{key:k});
+  const params={key:k};
+  if(studentId) params.studentId=studentId;
+  const data=await adminCall('adminCancel',params);
   if(!data?.success){ showToast(data?.error||'cancel failed'); return; }
   clearInterval(countdownIntervals[k]); delete countdownIntervals[k]; delete noShowTimers[k];
   logEvent('admin-cancel','Instructor cancelled '+k);
@@ -796,7 +961,7 @@ async function removeStudent(id){
   const data=await adminCall('removeStudent',{id});
   if(!data?.success){ showToast(data?.error||'could not remove'); return; }
   logEvent('roster','Removed student '+id);
-  await loadWheels(); await loadStudents(); await loadReservations(); await loadWaitlists(); await loadRoster();
+  await loadCatalog(); await loadStudents(); await loadReservations(); await loadWaitlists(); await loadRoster();
   renderDash();
 }
 async function addStudent(){
@@ -868,16 +1033,21 @@ db.channel('reservations-changes')
     renderSlots();
     if(instructorToken && Date.now()<instructorExpires) renderDash();
   })
-  .on('postgres_changes',{event:'*',schema:'public',table:'wheels'}, async ()=>{
-    await loadWheels();
+  .on('postgres_changes',{event:'*',schema:'public',table:'resources'}, async ()=>{
+    await loadCatalog();
     await loadReservations(); await loadWaitlists();
+    renderSlots();
+    if(instructorToken && Date.now()<instructorExpires) renderDash();
+  })
+  .on('postgres_changes',{event:'*',schema:'public',table:'rooms'}, async ()=>{
+    await loadCatalog();
     renderSlots();
     if(instructorToken && Date.now()<instructorExpires) renderDash();
   })
   .subscribe();
 
 async function init(){
-  await loadWheels();
+  await loadCatalog();
   await loadStudents();
   logEvent('system','Kinsal loaded');
 }

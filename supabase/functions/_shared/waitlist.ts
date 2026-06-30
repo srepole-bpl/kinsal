@@ -4,10 +4,24 @@
 // one-per-day rule). All writes happen with the service-role client, so this
 // works even with RLS locked down.
 import { sendWaitlistEmail } from "./email.ts";
+import { getResource, nextFreeSpot } from "./resources.ts";
 
 // deno-lint-ignore no-explicit-any
 export async function promoteAndNotify(db: any, slotKey: string): Promise<void> {
-  const [day] = slotKey.split("|");
+  const parts = slotKey.split("|");
+  const resourceId = parts[2];
+  if (!resourceId) return;
+
+  const resource = await getResource(db, resourceId);
+  if (!resource) return;
+
+  const { count } = await db
+    .from("reservations")
+    .select("key", { count: "exact", head: true })
+    .eq("key", slotKey);
+  if ((count ?? 0) >= resource.capacity) return;
+
+  const day = parts[0];
 
   const { data: wl } = await db
     .from("waitlists")
@@ -16,7 +30,6 @@ export async function promoteAndNotify(db: any, slotKey: string): Promise<void> 
     .order("position", { ascending: true });
   if (!wl || wl.length === 0) return;
 
-  // Who already has a reservation that day? They're not eligible.
   const { data: dayRes } = await db
     .from("reservations")
     .select("student_id")
@@ -26,10 +39,12 @@ export async function promoteAndNotify(db: any, slotKey: string): Promise<void> 
   const next = wl.find((w: { student_id: string }) => !bookedToday.has(w.student_id));
   if (!next) return;
 
-  // Claim the slot. If the unique key was filled in a race, insert fails and we stop.
+  const spot_index = await nextFreeSpot(db, slotKey, resource.capacity);
+  if (spot_index === null) return;
+
   const { error: insErr } = await db
     .from("reservations")
-    .insert({ key: slotKey, student_id: next.student_id });
+    .insert({ key: slotKey, student_id: next.student_id, spot_index });
   if (insErr) return;
 
   await db

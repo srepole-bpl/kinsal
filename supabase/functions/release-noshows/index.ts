@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
 
   let released = 0;
   for (const ns of due || []) {
-    await db.from("reservations").delete().eq("key", ns.key);
+    await db.from("reservations").delete().eq("key", ns.key).eq("student_id", ns.student_id);
     await db
       .from("no_shows")
       .update({ released_at: new Date().toISOString() })

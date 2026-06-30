@@ -1,21 +1,14 @@
 // manage-booking
 // All STUDENT writes go through here. Every booking rule is enforced
-// server-side: valid day/slot/wheel, real student, booking window (studio
-// timezone), one-reservation-per-day, and atomic slot claim. Cancel verifies
+// server-side: valid day/slot/resource, real student, booking window (studio
+// timezone), one-reservation-per-day, capacity-aware slot claim. Cancel verifies
 // ownership before deleting and then promotes the waitlist.
-//
-// NOTE: students are not yet individually authenticated (they identify by
-// email lookup), so this trusts the studentId it is given. That is acceptable
-// for a small roster but means the next hardening step is real student auth
-// (magic link). Until then, the high-severity risks — destructive admin writes
-// and unauthenticated DB access — are closed; impersonation within the roster
-// is a known, documented residual.
 import { json, preflight } from "../_shared/cors.ts";
 import { serviceClient } from "../_shared/db.ts";
+import { getResource, loadResourceIds, nextFreeSpot } from "../_shared/resources.ts";
 import { promoteAndNotify } from "../_shared/waitlist.ts";
-import { loadWheelIds } from "../_shared/wheels.ts";
 
-const STUDIO_TZ = "America/New_York"; // change if the studio is elsewhere
+const STUDIO_TZ = "America/New_York";
 const STUDIO_DAYS = ["Tuesday", "Thursday", "Saturday", "Sunday"];
 const SLOTS: Record<string, { start: number; end: number }> = {
   am: { start: 9, end: 13 },
@@ -27,7 +20,6 @@ function isValidEmail(e: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 }
 
-// Current wall-clock day + minutes in the studio timezone.
 function studioNow(): { dayIdx: number; minutes: number } {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: STUDIO_TZ,
@@ -42,8 +34,6 @@ function studioNow(): { dayIdx: number; minutes: number } {
   return { dayIdx: WEEK.indexOf(wd), minutes: hh * 60 + mm };
 }
 
-// Booking opens 2h before the slot starts, closes 1h before it ends.
-// All studio slots start at 9am or later, so the window never crosses midnight.
 function withinWindow(day: string, slotId: string): boolean {
   const sl = SLOTS[slotId];
   const target = WEEK.indexOf(day);
@@ -59,11 +49,11 @@ async function validSlot(
   db: ReturnType<typeof serviceClient>,
   day: string,
   slotId: string,
-  wheelId: string,
+  resourceId: string,
 ): Promise<boolean> {
   if (!STUDIO_DAYS.includes(day) || !SLOTS[slotId]) return false;
-  const wheelIds = await loadWheelIds(db);
-  return wheelIds.has(wheelId);
+  const resourceIds = await loadResourceIds(db);
+  return resourceIds.has(resourceId);
 }
 
 Deno.serve(async (req) => {
@@ -80,7 +70,6 @@ Deno.serve(async (req) => {
   const db = serviceClient();
   const action = String(body.action || "");
 
-  // ── LOOKUP ────────────────────────────────────────────────────────────────
   if (action === "lookup") {
     const email = String(body.email || "").trim().toLowerCase();
     if (!isValidEmail(email)) return json({ success: false, error: "invalid email" }, 400);
@@ -100,15 +89,14 @@ Deno.serve(async (req) => {
   const studentId = String(body.studentId || "");
   const day = String(body.day || "");
   const slotId = String(body.slotId || "");
-  const wheel = String(body.wheel || "");
-  const k = `${day}|${slotId}|${wheel}`;
+  const resourceId = String(body.resourceId || body.wheel || "");
+  const k = `${day}|${slotId}|${resourceId}`;
 
   if (!studentId) return json({ success: false, error: "missing student" }, 400);
-  if (!(await validSlot(db, day, slotId, wheel))) {
+  if (!(await validSlot(db, day, slotId, resourceId))) {
     return json({ success: false, error: "invalid slot" }, 400);
   }
 
-  // Confirm the student is real (and on the roster).
   const { data: stu } = await db
     .from("students")
     .select("id, name")
@@ -116,7 +104,6 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (!stu) return json({ success: false, error: "unknown student" }, 400);
 
-  // ── BOOK ──────────────────────────────────────────────────────────────────
   if (action === "book") {
     if (!withinWindow(day, slotId)) {
       return json({ success: false, error: "booking window is not open" }, 403);
@@ -129,30 +116,58 @@ Deno.serve(async (req) => {
     if (dayRes && dayRes.length > 0) {
       return json({ success: false, error: "you already have a reservation that day" }, 409);
     }
-    // Atomic claim — relies on the UNIQUE constraint on reservations.key.
-    const { error } = await db.from("reservations").insert({ key: k, student_id: studentId });
+
+    const resource = await getResource(db, resourceId);
+    if (!resource) return json({ success: false, error: "unknown resource" }, 400);
+
+    const { count } = await db
+      .from("reservations")
+      .select("key", { count: "exact", head: true })
+      .eq("key", k);
+    if ((count ?? 0) >= resource.capacity) {
+      return json({ success: false, error: "that slot is full" }, 409);
+    }
+
+    const spot_index = await nextFreeSpot(db, k, resource.capacity);
+    if (spot_index === null) {
+      return json({ success: false, error: "that slot is full" }, 409);
+    }
+
+    const { error } = await db.from("reservations").insert({
+      key: k,
+      student_id: studentId,
+      spot_index,
+    });
     if (error) return json({ success: false, error: "that slot is already taken" }, 409);
     return json({ success: true });
   }
 
-  // ── CANCEL ────────────────────────────────────────────────────────────────
   if (action === "cancel") {
-    const { data: r } = await db
+    const { data: rows } = await db
       .from("reservations")
       .select("student_id")
       .eq("key", k)
-      .maybeSingle();
-    if (!r) return json({ success: false, error: "no reservation to cancel" }, 404);
-    if (r.student_id !== studentId) {
-      return json({ success: false, error: "that reservation is not yours" }, 403);
+      .eq("student_id", studentId);
+    if (!rows || rows.length === 0) {
+      return json({ success: false, error: "no reservation to cancel" }, 404);
     }
-    await db.from("reservations").delete().eq("key", k);
+    await db.from("reservations").delete().eq("key", k).eq("student_id", studentId);
     await promoteAndNotify(db, k);
     return json({ success: true });
   }
 
-  // ── JOIN WAITLIST ───────────────────────────────────────────────────────────
   if (action === "join_waitlist") {
+    const resource = await getResource(db, resourceId);
+    if (!resource) return json({ success: false, error: "unknown resource" }, 400);
+
+    const { count } = await db
+      .from("reservations")
+      .select("key", { count: "exact", head: true })
+      .eq("key", k);
+    if ((count ?? 0) < resource.capacity) {
+      return json({ success: false, error: "slot is not full" }, 400);
+    }
+
     const { data: existing } = await db
       .from("waitlists")
       .select("id")

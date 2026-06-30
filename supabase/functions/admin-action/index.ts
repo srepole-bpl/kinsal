@@ -9,6 +9,12 @@ import { serviceClient } from "../_shared/db.ts";
 import { verifyInstructorToken } from "../_shared/jwt.ts";
 import { promoteAndNotify } from "../_shared/waitlist.ts";
 import {
+  maxConcurrentBookingsForResource,
+  parseResourcePayload,
+  parseRoomPayload,
+  resourceHasBookings,
+} from "../_shared/resources.ts";
+import {
   isValidWheelLabel,
   MAX_WHEELS,
   newWheelId,
@@ -29,13 +35,7 @@ function sanitizeName(s: string): string {
 
 // deno-lint-ignore no-explicit-any
 async function wheelHasBookings(db: any, wheelId: string): Promise<boolean> {
-  const pattern = `%|${wheelId}`;
-  const { data: res } = await db.from("reservations").select("key").like("key", pattern).limit(1);
-  if (res && res.length > 0) return true;
-  const { data: wl } = await db.from("waitlists").select("key").like("key", pattern).limit(1);
-  if (wl && wl.length > 0) return true;
-  const { data: ns } = await db.from("no_shows").select("key").like("key", pattern).limit(1);
-  return !!(ns && ns.length > 0);
+  return resourceHasBookings(db, wheelId);
 }
 
 Deno.serve(async (req) => {
@@ -123,8 +123,13 @@ Deno.serve(async (req) => {
   // ── ADMIN CANCEL ────────────────────────────────────────────────────────────
   if (action === "adminCancel") {
     const k = String(body.key || "");
+    const studentId = String(body.studentId || "");
     if (!k) return json({ success: false, error: "missing key" }, 400);
-    await db.from("reservations").delete().eq("key", k);
+    if (studentId) {
+      await db.from("reservations").delete().eq("key", k).eq("student_id", studentId);
+    } else {
+      await db.from("reservations").delete().eq("key", k);
+    }
     await promoteAndNotify(db, k);
     return json({ success: true });
   }
@@ -132,8 +137,11 @@ Deno.serve(async (req) => {
   // ── MARK NO-SHOW (release happens later via the cron job) ────────────────────
   if (action === "noShow") {
     const k = String(body.key || "");
+    const studentId = String(body.studentId || "");
     if (!k) return json({ success: false, error: "missing key" }, 400);
-    const { data: r } = await db.from("reservations").select("student_id").eq("key", k).maybeSingle();
+    let query = db.from("reservations").select("student_id").eq("key", k);
+    if (studentId) query = query.eq("student_id", studentId);
+    const { data: r } = await query.limit(1).maybeSingle();
     if (!r) return json({ success: false, error: "no reservation on that slot" }, 404);
     await db.from("no_shows").insert({
       key: k,
@@ -226,6 +234,143 @@ Deno.serve(async (req) => {
       .select("id, label, sort_order")
       .order("sort_order", { ascending: true });
     return json({ success: true, wheels: wheels || [] });
+  }
+
+  // ── ROOMS ────────────────────────────────────────────────────────────────────
+  if (action === "getRooms") {
+    const { data } = await db
+      .from("rooms")
+      .select("id, label, sort_order")
+      .order("sort_order", { ascending: true });
+    return json({ success: true, rooms: data || [] });
+  }
+
+  if (action === "saveRooms") {
+    let incoming: unknown;
+    try {
+      incoming = JSON.parse(String(body.rooms || "[]"));
+    } catch {
+      return json({ success: false, error: "invalid rooms data" }, 400);
+    }
+    const parsed = parseRoomPayload(incoming);
+    if (!parsed.ok) return json({ success: false, error: parsed.error }, 400);
+
+    const { data: existing } = await db.from("rooms").select("id");
+    const existingIds = new Set((existing || []).map((r: { id: string }) => r.id));
+    const newIds = new Set(parsed.rooms.map((r) => r.id));
+
+    for (const oldId of existingIds) {
+      if (newIds.has(oldId)) continue;
+      const { count } = await db
+        .from("resources")
+        .select("id", { count: "exact", head: true })
+        .eq("room_id", oldId);
+      if ((count ?? 0) > 0) {
+        return json({
+          success: false,
+          error: "cannot remove a room that still has resources",
+        }, 409);
+      }
+    }
+
+    for (const room of parsed.rooms) {
+      const { error } = await db.from("rooms").upsert({
+        id: room.id,
+        label: room.label,
+        sort_order: room.sort_order,
+      });
+      if (error) return json({ success: false, error: "could not save rooms" }, 500);
+    }
+
+    for (const oldId of existingIds) {
+      if (!newIds.has(oldId)) {
+        await db.from("rooms").delete().eq("id", oldId);
+      }
+    }
+
+    const { data: rooms } = await db
+      .from("rooms")
+      .select("id, label, sort_order")
+      .order("sort_order", { ascending: true });
+    return json({ success: true, rooms: rooms || [] });
+  }
+
+  // ── RESOURCES ────────────────────────────────────────────────────────────────
+  if (action === "getResources") {
+    const { data } = await db
+      .from("resources")
+      .select("id, room_id, label, category, capacity, sort_order")
+      .order("sort_order", { ascending: true });
+    return json({ success: true, resources: data || [] });
+  }
+
+  if (action === "saveResources") {
+    let incoming: unknown;
+    try {
+      incoming = JSON.parse(String(body.resources || "[]"));
+    } catch {
+      return json({ success: false, error: "invalid resources data" }, 400);
+    }
+    const parsed = parseResourcePayload(incoming);
+    if (!parsed.ok) return json({ success: false, error: parsed.error }, 400);
+
+    const roomIds = new Set(parsed.resources.map((r) => r.room_id));
+    const { data: dbRooms } = await db.from("rooms").select("id");
+    const validRoomIds = new Set((dbRooms || []).map((r: { id: string }) => r.id));
+    for (const rid of roomIds) {
+      if (!validRoomIds.has(rid)) {
+        return json({ success: false, error: "resource references unknown room" }, 400);
+      }
+    }
+
+    const { data: existing } = await db.from("resources").select("id, capacity");
+    const existingIds = new Set((existing || []).map((r: { id: string }) => r.id));
+    const newIds = new Set(parsed.resources.map((r) => r.id));
+
+    for (const res of parsed.resources) {
+      if (!existingIds.has(res.id)) continue;
+      const maxBooked = await maxConcurrentBookingsForResource(db, res.id);
+      if (res.capacity < maxBooked) {
+        return json({
+          success: false,
+          error: `cannot reduce seats below current bookings (${maxBooked} booked) for ${res.label}`,
+        }, 409);
+      }
+    }
+
+    for (const oldId of existingIds) {
+      if (newIds.has(oldId)) continue;
+      if (await resourceHasBookings(db, oldId)) {
+        return json({
+          success: false,
+          error: "cannot remove resource with active bookings or waitlists",
+        }, 409);
+      }
+    }
+
+    for (const res of parsed.resources) {
+      const { error } = await db.from("resources").upsert({
+        id: res.id,
+        room_id: res.room_id,
+        label: res.label,
+        category: res.category,
+        capacity: res.capacity,
+        sort_order: res.sort_order,
+      });
+      if (error) return json({ success: false, error: "could not save resources" }, 500);
+    }
+
+    for (const oldId of existingIds) {
+      if (!newIds.has(oldId)) {
+        await db.from("resources").delete().eq("id", oldId);
+      }
+    }
+
+    const { data: resources } = await db
+      .from("resources")
+      .select("id, room_id, label, category, capacity, sort_order")
+      .order("sort_order", { ascending: true });
+    return json({ success: true, resources: resources || [] });
   }
 
   return json({ success: false, error: "unknown action" }, 400);
