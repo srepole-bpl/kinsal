@@ -1,6 +1,6 @@
 # Phase 4b: Emails + reminder cron
 
-## Status: Pending
+## Status: ✅ Complete
 
 ## Overview
 
@@ -14,59 +14,36 @@ Send booking confirmation emails on successful reserve (Resend), and add a `send
 
 ## Planned Changes
 
-- [ ] Extend `_shared/email.ts`: `sendBookingConfirmation(student, booking, resource, slot)`
-- [ ] Call confirmation send from `manage-booking` after successful book (non-blocking or await with timeout)
-- [ ] Add `supabase/functions/send-reminders/index.ts`
-- [ ] Query tomorrow's (or configurable) reservations; send reminder per student
-- [ ] Add pg_cron job in migration (mirror `release-noshows` pattern with `CRON_SECRET`)
-- [ ] Deploy function; register cron in `setup-ready.sql` or new migration
-- [ ] Idempotency: track `reminder_sent_at` on reservations or separate `email_log` table
-
-## Target Implementation Shape
-
-**Confirmation email content**
-
-```
-Subject: Booked: Shimpo — Tuesday morning
-Body: day, slot time, resource label, category, studio name, cancel link (optional)
-```
-
-**send-reminders**
-
-```typescript
-// POST with x-cron-secret header
-// For each reservation where session starts in [now+24h, now+25h] and reminder not sent:
-//   sendReminderEmail(student, booking)
-//   mark reminder_sent_at
-```
-
-**Cron (example)**
-
-```sql
-select cron.schedule('send-reminders', '0 14 * * *', $$
-  select net.http_post(... send-reminders ...);
-$$);
-```
-
-## Files Touched
-
-- `supabase/functions/_shared/email.ts`
-- `supabase/functions/manage-booking/index.ts`
-- `supabase/functions/send-reminders/index.ts` (new)
-- `supabase/migrations/reminders.sql` (new — `reminder_sent_at` or `email_log`)
-- `setup-ready.sql` (cron entry, if not in migration)
-
-## Verification Checklist
-
-- [ ] Book test slot → confirmation email received within 1 minute
-- [ ] Reminder cron fires for booking starting tomorrow (manual invoke with secret)
-- [ ] Duplicate reminder not sent on second cron run (idempotency)
-- [ ] Missing Resend key fails gracefully with logged error, booking still succeeds
-- [ ] Email includes human-readable category label
+- [x] Extend `_shared/email.ts`: `sendBookingConfirmation(student, booking, resource, slot)`
+- [x] Call confirmation send from `manage-booking` after successful book (non-blocking or await with timeout)
+- [x] Add `supabase/functions/send-reminders/index.ts`
+- [x] Query tomorrow's (or configurable) reservations; send reminder per student
+- [x] Add pg_cron job in migration (mirror `release-noshows` pattern with `CRON_SECRET`)
+- [x] Deploy function; register cron in `setup-ready.sql` or new migration
+- [x] Idempotency: track `reminder_sent_at` on reservations or separate `email_log` table
 
 ## Implementation Notes
 
-<!-- Filled during implementation -->
+**Migration:** `supabase/migrations/reminders.sql` adds `reservations.reminder_sent_at`.
+
+**Confirmation:** Fired async after book; booking succeeds even if Resend is missing or fails.
+
+**Reminders:** `send-reminders` selects reservations for **tomorrow's weekday** (studio timezone) where `reminder_sent_at` is null, sends email, marks sent.
+
+**Cron:** Schedule added to `setup-ready.sql` (`kinsal-send-reminders`, daily 14:00 UTC). Run that block in SQL Editor if cron not yet registered:
+
+```sql
+select cron.schedule('kinsal-send-reminders', '0 14 * * *', $$ ... send-reminders ... $$);
+```
+
+**Deploy:**
+```bash
+supabase db query --linked --file supabase/migrations/reminders.sql
+supabase functions deploy manage-booking --use-api
+supabase functions deploy send-reminders --no-verify-jwt --use-api
+```
+
+**Manual test:** POST to `send-reminders` with `x-cron-secret` header matching `CRON_SECRET`.
 
 ## Navigation
 

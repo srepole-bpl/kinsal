@@ -63,3 +63,15 @@ export async function promoteAndNotify(db: any, slotKey: string): Promise<void> 
     await sendWaitlistEmail(db, stu.email, stu.name ?? "", slotKey);
   }
 }
+
+// deno-lint-ignore no-explicit-any
+export async function recompactWaitlist(db: any, slotKey: string): Promise<void> {
+  const { data: remaining } = await db
+    .from("waitlists")
+    .select("id")
+    .eq("key", slotKey)
+    .order("position", { ascending: true });
+  for (let i = 0; i < (remaining || []).length; i++) {
+    await db.from("waitlists").update({ position: i }).eq("id", remaining[i].id);
+  }
+}

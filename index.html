@@ -102,7 +102,12 @@ input[type=text],input[type=password],input[type=email]{padding:9px 12px;border-
 .hours-tile{background:var(--bg2);border-radius:9px 10px 9px 10px;border:1px solid var(--border);padding:.7rem .8rem;text-align:center}
 .hours-val{font-family:var(--font-head);font-size:20px;font-weight:400;color:var(--ink);letter-spacing:-0.02em}
 .hours-label{font-size:10.5px;color:var(--ink3);margin-top:2px;text-transform:lowercase}
-.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+.booking-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.booking-row:last-child{border-bottom:none;padding-bottom:0}
+.booking-title{font-size:13px;font-weight:500;color:var(--ink)}
+.booking-meta{font-size:11.5px;color:var(--ink3);margin-top:2px;line-height:1.5}
+.booking-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;flex-shrink:0}
+.booking-empty{font-size:12.5px;color:var(--ink3);padding:4px 0}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
@@ -149,6 +154,10 @@ input[type=text],input[type=password],input[type=email]{padding:9px 12px;border-
       <div class="avatar" id="student-avatar" style="width:38px;height:38px;font-size:13px"></div>
     </div>
     <div class="hours-grid" id="student-hours"></div>
+  </div>
+  <div class="student-card" id="my-bookings-panel">
+    <div style="font-family:var(--font-head);font-size:15px;font-weight:500;margin-bottom:8px">my bookings</div>
+    <div id="my-bookings-list"></div>
   </div>
   <div class="rule-box" role="note">
     <div><i class="ti ti-clock" aria-hidden="true"></i>reserve up to 2 hours before each slot</div>
@@ -266,6 +275,130 @@ function categoryLabel(c){
   return {wheel:'wheel',hand_build_table:'hand building',clay_prep_table:'clay prep',glaze_table:'glaze'}[c]||c;
 }
 function resourceLabel(id){ return resourceMap[id]?.label||id; }
+function roomLabel(roomId){ return rooms.find(r=>r.id===roomId)?.label||''; }
+function parseKey(k){ const p=k.split('|'); return {day:p[0],slotId:p[1],resourceId:p[2]}; }
+function bookingSortKey(day,slotId){
+  const week=WEEKDAY_OPTIONS;
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:studioTimezone,weekday:'long'}).formatToParts(new Date());
+  const today=week.indexOf(parts.find(p=>p.type==='weekday')?.value??'');
+  const dayIdx=week.indexOf(day);
+  const daysUntil=(dayIdx-today+7)%7;
+  const slot=getSlots().find(s=>s.id===slotId);
+  return daysUntil*10+(slot?.sort_order??0);
+}
+function getMyBookings(){
+  if(!currentStudent) return [];
+  const items=[];
+  Object.entries(reservations).forEach(([k,ids])=>{
+    if(!ids.includes(currentStudent.id)) return;
+    const {day,slotId,resourceId}=parseKey(k);
+    const slot=getSlots().find(s=>s.id===slotId);
+    const res=resourceMap[resourceId];
+    if(!slot||!res) return;
+    items.push({k,day,slotId,resourceId,slot,res,type:'booking',sortKey:bookingSortKey(day,slotId)});
+  });
+  Object.entries(waitlists).forEach(([k,ids])=>{
+    const pos=ids.indexOf(currentStudent.id);
+    if(pos===-1) return;
+    const {day,slotId,resourceId}=parseKey(k);
+    const slot=getSlots().find(s=>s.id===slotId);
+    const res=resourceMap[resourceId];
+    if(!slot||!res) return;
+    items.push({k,day,slotId,resourceId,slot,res,type:'waitlist',position:pos+1,sortKey:bookingSortKey(day,slotId)});
+  });
+  items.sort((a,b)=>a.sortKey-b.sortKey);
+  return items;
+}
+function renderMyBookings(){
+  const el=document.getElementById('my-bookings-list');
+  if(!el||!currentStudent) return;
+  const items=getMyBookings();
+  if(!items.length){
+    el.innerHTML='<div class="booking-empty">no upcoming reservations or waitlists</div>';
+    return;
+  }
+  el.innerHTML=items.map(item=>{
+    const cat=categoryLabel(item.res.category);
+    const room=roomLabel(item.res.room_id);
+    const meta=[item.day,item.slot.label,item.slot.time,`${item.res.label} (${cat})`,room].filter(Boolean).join(' · ');
+    const actions=item.type==='booking'
+      ?`<button class="btn btn-sm" onclick="downloadBookingIcs('${esc(item.day)}','${esc(item.slotId)}','${esc(item.resourceId)}')"><i class="ti ti-calendar-plus"></i> calendar</button>
+         <button class="btn btn-sm btn-danger" onclick="cancelRes('${esc(item.day)}','${esc(item.slotId)}','${esc(item.resourceId)}')">cancel</button>`
+      :`<span class="muted" style="font-size:11px">waitlist #${item.position}</span>
+         <button class="btn btn-sm" onclick="leaveWaitlist('${esc(item.day)}','${esc(item.slotId)}','${esc(item.resourceId)}')">leave waitlist</button>`;
+    const title=item.type==='booking'?'reserved':'on waitlist';
+    return `<div class="booking-row">
+      <div><div class="booking-title">${title}</div><div class="booking-meta">${esc(meta)}</div></div>
+      <div class="booking-actions">${actions}</div>
+    </div>`;
+  }).join('');
+}
+function nextSessionDates(day,slot){
+  const week=WEEKDAY_OPTIONS;
+  const target=week.indexOf(day);
+  const now=new Date();
+  for(let add=0;add<8;add++){
+    const probe=new Date(now.getTime()+add*86400000);
+    const parts=new Intl.DateTimeFormat('en-US',{timeZone:studioTimezone,weekday:'long',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(probe);
+    if(week.indexOf(parts.find(p=>p.type==='weekday')?.value??'')!==target) continue;
+    const y=parts.find(p=>p.type==='year').value;
+    const m=parts.find(p=>p.type==='month').value;
+    const d=parts.find(p=>p.type==='day').value;
+    const pad=n=>String(n).padStart(2,'0');
+    return {
+      dtStart:`${y}${m}${d}T${pad(slot.start)}0000`,
+      dtEnd:`${y}${m}${d}T${pad(slot.end)}0000`
+    };
+  }
+  return null;
+}
+function formatIcsUtc(date){
+  const pad=n=>String(n).padStart(2,'0');
+  return date.getUTCFullYear()+pad(date.getUTCMonth()+1)+pad(date.getUTCDate())+'T'+pad(date.getUTCHours())+pad(date.getUTCMinutes())+pad(date.getUTCSeconds())+'Z';
+}
+function bookingToIcs(day,slotId,resourceId){
+  const slot=getSlots().find(s=>s.id===slotId);
+  const res=resourceMap[resourceId];
+  if(!slot||!res) return '';
+  const dates=nextSessionDates(day,slot);
+  if(!dates) return '';
+  const cat=categoryLabel(res.category);
+  const room=roomLabel(res.room_id);
+  const uid=`${day}-${slotId}-${resourceId}-${currentStudent?.id||'guest'}@kinsal`;
+  const summary=`${res.label} (${cat}) — Kinsal`;
+  const description=[day,slot.label,slot.time,room].filter(Boolean).join(' · ');
+  return [
+    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Kinsal//Studio Booking//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${formatIcsUtc(new Date())}`,
+    `DTSTART;TZID=${studioTimezone}:${dates.dtStart}`,
+    `DTEND;TZID=${studioTimezone}:${dates.dtEnd}`,
+    `SUMMARY:${summary}`,
+    `DESCRIPTION:${description}`,
+    'END:VEVENT','END:VCALENDAR'
+  ].join('\r\n');
+}
+function downloadBookingIcs(day,slotId,resourceId){
+  const ics=bookingToIcs(day,slotId,resourceId);
+  if(!ics){ showRateBanner('could not build calendar file',true); return; }
+  const res=resourceMap[resourceId];
+  const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`kinsal-${day.toLowerCase()}-${res?.label||resourceId}.ics`.replace(/\s+/g,'-');
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('calendar file downloaded');
+}
+async function leaveWaitlist(day,slotId,resourceId){
+  if(!currentStudent) return;
+  if(isRateLimited('leave-waitlist')){ showRateBanner('please wait',true); return; }
+  const {data}=await edgeCall('manage-booking',{action:'leave_waitlist',studentId:currentStudent.id,day,slotId,resourceId});
+  if(!data.success){ showRateBanner(data.error||'could not leave waitlist',true); return; }
+  logEvent('waitlist',`${currentStudent.name} left waitlist · ${key(day,slotId,resourceId)}`);
+  await loadWaitlists(); renderSlots(); renderMyBookings();
+}
 function rebuildResourceMap(){ resourceMap={}; resources.forEach(r=>{ resourceMap[r.id]=r; }); }
 function rebuildResourcesByRoom(){
   resourcesByRoom={};
@@ -487,7 +620,7 @@ async function enterStudentView(){
   document.getElementById('student-email-display').textContent=currentStudent.email;
   document.getElementById('student-avatar').textContent=currentStudent.name.split(' ').map(n=>n[0]).join('').toUpperCase();
   await refreshStudentStats();
-  showView('student-view'); renderDayTabs(); renderSlots();
+  showView('student-view'); renderDayTabs(); renderSlots(); renderMyBookings();
 }
 function signOutStudent(){ currentStudent=null; document.getElementById('email-input').value=''; showView('email-view'); logEvent('logout','Student signed out'); }
 
@@ -535,7 +668,7 @@ async function bookSlot(day,slotId,resourceId){
     const {data}=await edgeCall('manage-booking',{action:'book',studentId:currentStudent.id,day,slotId,resourceId});
     if(!data.success){ showRateBanner(data.error||'booking failed',true); logEvent('booking-fail',data.error); await loadReservations(); renderSlots(); return; }
     logEvent('booking',`${currentStudent.name} reserved ${resourceLabel(resourceId)} · ${day} ${sl?.label}`);
-    await loadReservations(); await refreshStudentStats(); renderSlots();
+    await loadReservations(); await refreshStudentStats(); renderSlots(); renderMyBookings();
   };
   openModal('confirm reservation',`reserve ${resourceLabel(resourceId)} for the ${sl?.label} slot (${sl?.time}) on ${day}?`,'confirm');
 }
@@ -549,7 +682,7 @@ async function cancelRes(day,slotId,resourceId){
     if(!data.success){ showRateBanner(data.error||'cancel failed',true); return; }
     clearInterval(countdownIntervals[k]); delete countdownIntervals[k]; delete noShowTimers[k];
     logEvent('cancel',`${currentStudent.name} cancelled ${resourceLabel(resourceId)} · ${day} ${slotId}`);
-    await loadReservations(); await loadWaitlists(); await refreshStudentStats(); renderSlots();
+    await loadReservations(); await loadWaitlists(); await refreshStudentStats(); renderSlots(); renderMyBookings();
   };
   openModal('cancel reservation','are you sure you want to cancel your reservation?','yes, cancel');
 }
@@ -562,7 +695,7 @@ async function joinWaitlist(day,slotId,resourceId){
   const {data}=await edgeCall('manage-booking',{action:'join_waitlist',studentId:currentStudent.id,day,slotId,resourceId});
   if(!data.success){ showRateBanner(data.error||'could not join waitlist',true); return; }
   logEvent('waitlist',`${currentStudent.name} joined waitlist · ${k}`);
-  await loadWaitlists(); renderSlots();
+  await loadWaitlists(); renderSlots(); renderMyBookings();
 }
 
 /* ── NO-SHOW (instructor marks it; SERVER cron releases it after 30 min) ──── */
@@ -708,6 +841,7 @@ function renderSlots(){
         html+=`<div style="font-size:11.5px;color:var(--ink3);padding:4px 0 6px 4px">
           <i class="ti ti-list" aria-hidden="true"></i> ${wl.length>0?`waitlist: ${wl.length}`:'slot full'}${pos>-1?` <strong>· you are #${pos+1}</strong>`:''}
           ${canJoin?`<button class="btn btn-sm" style="margin-left:8px;font-size:11px;padding:3px 8px" onclick="joinWaitlist('${esc(currentDay)}','${esc(s.id)}','${esc(r.id)}')">join waitlist</button>`:''}
+          ${pos>-1?`<button class="btn btn-sm" style="margin-left:8px;font-size:11px;padding:3px 8px" onclick="leaveWaitlist('${esc(currentDay)}','${esc(s.id)}','${esc(r.id)}')">leave waitlist</button>`:''}
         </div>`;
       }
     });
@@ -1172,12 +1306,14 @@ db.channel('reservations-changes')
     }
     await loadReservations(); await loadWaitlists();
     renderSlots();
+    if(currentStudent) renderMyBookings();
     if(instructorToken && Date.now()<instructorExpires) renderDash();
   })
   .on('postgres_changes',{event:'*',schema:'public',table:'resources'}, async ()=>{
     await loadCatalog();
     await loadReservations(); await loadWaitlists();
     renderSlots();
+    if(currentStudent) renderMyBookings();
     if(instructorToken && Date.now()<instructorExpires) renderDash();
   })
   .on('postgres_changes',{event:'*',schema:'public',table:'rooms'}, async ()=>{

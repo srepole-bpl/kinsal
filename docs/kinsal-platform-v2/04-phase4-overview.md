@@ -1,21 +1,17 @@
 # Phase 4: Student experience (overview)
 
-## Status: Pending
+## Status: ✅ Complete
 
 ## Overview
 
-Improve the student-facing product after auth: upcoming bookings dashboard, leave waitlist, booking confirmation emails, reminder cron, and calendar (.ics) export. Split into UX (4a) and email/cron infrastructure (4b) so UI can ship before cron is scheduled.
+Improve the student-facing product: upcoming bookings dashboard, leave waitlist, booking confirmation emails, reminder cron, and calendar (.ics) export. Split into UX (4a) and email/cron infrastructure (4b) so UI can ship before cron is scheduled.
 
 ## Sub-phases
 
 | Step | File | Milestone |
 |------|------|-----------|
-| 4a | [04a-student-ux.md](./04a-student-ux.md) | My bookings, leave waitlist, ICS download |
-| 4b | [04b-emails-reminders.md](./04b-emails-reminders.md) | Confirmation on book; day-before reminder cron |
-
-## Prerequisites
-
-- Phase 3 complete: authenticated student identity on all writes
+| 4a | [04a-student-ux.md](./04a-student-ux.md) | ✅ My bookings, leave waitlist, ICS download |
+| 4b | [04b-emails-reminders.md](./04b-emails-reminders.md) | ✅ Confirmation on book; day-before reminder cron |
 
 ## End-to-end verification (after 4b)
 

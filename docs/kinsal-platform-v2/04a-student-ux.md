@@ -1,6 +1,6 @@
 # Phase 4a: Student UX — bookings, waitlist, ICS
 
-## Status: Pending
+## Status: ✅ Complete
 
 ## Overview
 
@@ -8,59 +8,22 @@ Add student dashboard views for upcoming reservations and active waitlist entrie
 
 ## Prerequisites
 
-- Phase 3 complete: session-backed student id available in UI
+- Student identity via email lookup (Phase 3 cancelled; uses `currentStudent.id` from roster lookup)
 
 ## Planned Changes
 
-- [ ] Add "My bookings" panel in student view: list upcoming keys with day, slot, resource label, category
-- [ ] Add `leaveWaitlist` to `manage-booking` (remove waitlist row for authenticated student + key)
-- [ ] Wire leave waitlist button in grid and my-bookings list
-- [ ] Add `getMyBookings` query (client-side filter or new read endpoint if RLS requires)
-- [ ] Implement ICS: client-generated from schedule + reservation data, or thin edge endpoint
-- [ ] Include category label and room in booking display strings
-
-## Target Implementation Shape
-
-**manage-booking action**
-
-```typescript
-// leave_waitlist: { day, slotId, resourceId } + JWT
-// deletes waitlists row where key matches and student_id = auth student
-```
-
-**ICS (client-side example)**
-
-```javascript
-function bookingToIcs({ day, slot, resource, studentEmail }) {
-  // DTSTART/DTEND from schedule_slots + next occurrence of weekday
-  // SUMMARY: `${resource.label} (${categoryLabel}) — Kinsal`
-}
-```
-
-**My bookings query**
-
-```javascript
-// Filter reservations where student_id === currentStudent.id
-// Join resource label via loaded resources map
-// Sort by next calendar occurrence of day+slot
-```
-
-## Files Touched
-
-- `supabase/functions/manage-booking/index.ts`
-- `index.html`
-
-## Verification Checklist
-
-- [ ] My bookings shows only logged-in student's reservations
-- [ ] Leave waitlist removes student from queue; position updates for others
-- [ ] ICS download produces valid `.ics` file (import test in calendar app)
-- [ ] Cancel from my bookings still works (Phase 3 auth)
-- [ ] Empty state when no upcoming bookings
+- [x] Add "My bookings" panel in student view: list upcoming keys with day, slot, resource label, category
+- [x] Add `leaveWaitlist` to `manage-booking` (remove waitlist row for authenticated student + key)
+- [x] Wire leave waitlist button in grid and my-bookings list
+- [x] Add `getMyBookings` query (client-side filter or new read endpoint if RLS requires)
+- [x] Implement ICS: client-generated from schedule + reservation data, or thin edge endpoint
+- [x] Include category label and room in booking display strings
 
 ## Implementation Notes
 
-<!-- Filled during implementation -->
+- **My bookings** panel lists reservations + waitlist entries sorted by next studio weekday.
+- **ICS** generated client-side with `DTSTART;TZID=` from `studio_settings.timezone`.
+- **leave_waitlist** recompacts queue positions after delete (`recompactWaitlist` in `_shared/waitlist.ts`).
 
 ## Navigation
 

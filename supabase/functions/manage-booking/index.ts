@@ -5,9 +5,10 @@
 // ownership before deleting and then promotes the waitlist.
 import { json, preflight } from "../_shared/cors.ts";
 import { serviceClient } from "../_shared/db.ts";
+import { sendBookingConfirmation } from "../_shared/email.ts";
 import { getResource, loadResourceIds, nextFreeSpot } from "../_shared/resources.ts";
 import { isBookingOpen, loadSchedule } from "../_shared/schedule.ts";
-import { promoteAndNotify } from "../_shared/waitlist.ts";
+import { promoteAndNotify, recompactWaitlist } from "../_shared/waitlist.ts";
 
 function isValidEmail(e: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
@@ -69,7 +70,7 @@ Deno.serve(async (req) => {
 
   const { data: stu } = await db
     .from("students")
-    .select("id, name")
+    .select("id, name, email")
     .eq("id", studentId)
     .maybeSingle();
   if (!stu) return json({ success: false, error: "unknown student" }, 400);
@@ -110,6 +111,15 @@ Deno.serve(async (req) => {
       spot_index,
     });
     if (error) return json({ success: false, error: "that slot is already taken" }, 409);
+
+    if (stu.email) {
+      sendBookingConfirmation(db, schedule, stu.name ?? "", stu.email, {
+        day,
+        slotId,
+        resourceId,
+      }).catch((e) => console.error("confirmation email failed:", e));
+    }
+
     return json({ success: true });
   }
 
@@ -153,6 +163,19 @@ Deno.serve(async (req) => {
       .from("waitlists")
       .insert({ key: k, student_id: studentId, position });
     if (error) return json({ success: false, error: "could not join waitlist" }, 500);
+    return json({ success: true });
+  }
+
+  if (action === "leave_waitlist") {
+    const { data: row } = await db
+      .from("waitlists")
+      .select("id")
+      .eq("key", k)
+      .eq("student_id", studentId)
+      .maybeSingle();
+    if (!row) return json({ success: false, error: "not on this waitlist" }, 404);
+    await db.from("waitlists").delete().eq("id", row.id);
+    await recompactWaitlist(db, k);
     return json({ success: true });
   }
 
