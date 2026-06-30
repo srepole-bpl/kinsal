@@ -16,13 +16,22 @@ Operational tools for Salma: block slots/resources, mark closed days, roster CSV
 
 ## Prerequisites
 
-- Phase 3 complete (auth)
-- Phase 4 recommended (emails for no-show notifications optional)
+- Phase 2 complete: schedule from DB ✅
+- Phase 4 complete: book flow + confirmation emails ✅
+- Phase 3 **not required** (cancelled; student login is email lookup)
+
+## Architecture (see [implementation-plan.md](./implementation-plan.md))
+
+- **Closed days:** calendar dates in `closed_days`; at book time resolve next occurrence of weekday in studio TZ
+- **Slot blocks:** prefix match on `day|slot|resource` key
+- **PIN change:** `instructor_secrets` table (not Supabase Management API)
+- **Weekly cap:** count reservations in rolling Mon–Sun week (studio timezone)
+- **No-show block:** `release-noshows` increments count; instructor clears in roster UI
 
 ## End-to-end verification (after 5c)
 
 - Blocked resource cannot be booked (403)
-- Closed day disables grid
+- Closed day disables booking for that calendar date
 - CSV import adds students; export downloads reservations
 - Audit log shows instructor actions after browser refresh
 - PIN change works without Supabase dashboard

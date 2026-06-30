@@ -8,8 +8,8 @@ Allow instructor to block specific resource/slot combinations and mark entire ca
 
 ## Prerequisites
 
-- Phase 2 complete: schedule from DB
-- Phase 1 complete: resource ids in reservation keys
+- Phase 2 complete: schedule from DB ✅
+- Phase 1 complete: resource ids in reservation keys ✅
 
 ## Planned Changes
 

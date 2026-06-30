@@ -38,7 +38,7 @@
 
 ## Current Context
 
-Phase 4 **complete and deployed**. Next: **Phase 5** — instructor ops ([05-phase5-overview.md](./05-phase5-overview.md)).
+- Phase 4 **complete and deployed**. Next: **Phase 5a** — blocks + closed days ([05a-blocks-closed-days.md](./05a-blocks-closed-days.md)). See [implementation-plan.md](./implementation-plan.md) for architecture decisions.
 
 ## Architectural Decisions Made
 
@@ -50,7 +50,7 @@ Phase 4 **complete and deployed**. Next: **Phase 5** — instructor ops ([05-pha
 ## Blockers / Open Questions
 
 - [ ] Pixiset exact origin URL for Phase 7 CORS (add when known)
-- [ ] Supabase Management API access for in-app PIN change (Phase 5c) — confirm token scope
+- [x] ~~Supabase Management API for in-app PIN change~~ — use `instructor_secrets` table instead (see implementation-plan Decision 8)
 
 ## Phase 1 split rationale
 

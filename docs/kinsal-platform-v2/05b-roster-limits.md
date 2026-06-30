@@ -8,8 +8,8 @@ CSV import/export for roster and reservations, configurable weekly booking cap p
 
 ## Prerequisites
 
-- Phase 5a complete (optional but recommended)
-- Existing `students` table and `release-noshows` function
+- Phase 5a complete (recommended)
+- Existing `students` table and `release-noshows` function ✅
 
 ## Planned Changes
 

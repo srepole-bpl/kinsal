@@ -46,7 +46,7 @@ create table audit_log (
 // writeAudit('instructor', 'change_pin', {})
 ```
 
-**Open question (from index):** Confirm Supabase Management API token scope for `secrets set` from edge function — fallback is instructor-only hash table readable by `verify-pin`.
+**Open question (resolved):** PIN stored in `instructor_secrets` table (service-role only). `verify-pin` reads DB hash; `changePin` in admin-action updates it. Env `PIN_HASH` remains fallback until first change.
 
 ## Files Touched
 
