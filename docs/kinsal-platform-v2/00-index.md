@@ -28,6 +28,7 @@
 | 5c. Audit + PIN | [05c-audit-pin.md](./05c-audit-pin.md) | ✅ Complete | `6c749f5` |
 | 6. Communications | [06-communications.md](./06-communications.md) | ✅ Complete | `6e6b3eb` |
 | 7. Polish + security | [07-polish-security.md](./07-polish-security.md) | ✅ Complete | `0739eef` |
+| 8. Instructor slot emails | [08-instructor-slot-notify.md](./08-instructor-slot-notify.md) | ✅ Complete | pending |
 
 ## Status Legend
 
@@ -38,7 +39,7 @@
 
 ## Current Context
 
-- Phase 7 **complete and deployed** — all v2 phases done. CORS locked to the Pages origin, iframe autosize, offline + loading UX, and mobile polish shipped.
+- Phase 8 **complete** — instructor roster update emails at T-30 and midpoint (email only, only when roster changed). Configure email in Settings → Instructor notifications.
 
 ## Architectural Decisions Made
 

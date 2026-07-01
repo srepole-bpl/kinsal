@@ -297,6 +297,7 @@ let slotBlocks=[], closedDays=[];
 let maxBookingsPerWeek=4, noShowThreshold=3;
 let draftMaxBookingsPerWeek=4, draftNoShowThreshold=3;
 let draftEmailTemplates=[];
+let draftInstructorEmail='', draftInstructorNotifyEnabled=true;
 const EMAIL_TEMPLATE_META=[
   {key:'waitlist_promotion',label:'waitlist promotion',vars:'{{student_first_name}}, {{day}}, {{slot_label}}, {{resource_label}}, {{category_label}}'},
   {key:'booking_confirmation',label:'booking confirmation',vars:'{{student_first_name}}, {{day}}, {{slot_label}}, {{slot_short_label}}, {{resource_label}}, {{category_label}}'},
@@ -1173,6 +1174,17 @@ async function renderDash(){
       <button class="btn btn-sm btn-primary" onclick="confirmBroadcastEmail()">send broadcast</button>
       <div id="broadcast-result" class="muted" style="font-size:12px;display:none"></div>
     </div>
+    <div class="section-label" style="margin-top:16px">instructor notifications</div>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">roster update emails at 30 minutes before each class and at the halfway point — <strong>only if the roster changed</strong> since the last update. you won't get an email on every booking.</p>
+    <div style="display:grid;gap:8px;max-width:400px">
+      <label style="font-size:12px;color:var(--ink3)">your email</label>
+      <input type="email" id="instructor-notify-email" value="${esc(draftInstructorEmail)}" placeholder="you@example.com" maxlength="120" style="width:100%">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);cursor:pointer;margin-top:4px">
+        <input type="checkbox" id="instructor-notify-enabled" ${draftInstructorNotifyEnabled?'checked':''}>
+        slot update emails enabled
+      </label>
+      <button class="btn btn-sm btn-primary" onclick="saveInstructorNotifySettings()">save notification settings</button>
+    </div>
     <div class="section-label" style="margin-top:16px">booking window</div>
     <p style="font-size:13px;color:var(--ink2);margin-bottom:.75rem">opens 2 hours before each slot starts. closes 1 hour before the slot ends. enforced server-side.</p>
     <div class="section-label">no-show window</div>
@@ -1199,6 +1211,7 @@ async function renderDash(){
   renderBlockSettingsList();
   renderClosedDaysList();
   renderEmailTemplateSettings();
+  loadInstructorNotifySettings();
 }
 
 function renderSecurityLog(){
@@ -1639,6 +1652,31 @@ async function saveEmailTemplates(){
   logEvent('settings','Email templates updated');
   showToast('templates saved');
 }
+async function loadInstructorNotifySettings(){
+  if(!requireSession()) return;
+  const data=await adminCall('getInstructorNotifySettings',{});
+  if(!data?.success) return;
+  draftInstructorEmail=data.instructor_email||'';
+  draftInstructorNotifyEnabled=data.instructor_slot_notify_enabled!==false;
+  const emailEl=document.getElementById('instructor-notify-email');
+  const enabledEl=document.getElementById('instructor-notify-enabled');
+  if(emailEl) emailEl.value=draftInstructorEmail;
+  if(enabledEl) enabledEl.checked=draftInstructorNotifyEnabled;
+}
+async function saveInstructorNotifySettings(){
+  if(!requireSession()) return;
+  const email=(document.getElementById('instructor-notify-email')?.value||'').trim().toLowerCase();
+  const enabled=!!document.getElementById('instructor-notify-enabled')?.checked;
+  const data=await adminCall('saveInstructorNotifySettings',{
+    instructor_email:email,
+    instructor_slot_notify_enabled:enabled?'true':'false',
+  });
+  if(!data?.success){ showToast(data?.error||'could not save notification settings'); return; }
+  draftInstructorEmail=data.instructor_email||'';
+  draftInstructorNotifyEnabled=data.instructor_slot_notify_enabled!==false;
+  logEvent('settings','Instructor notify settings updated');
+  showToast('notification settings saved');
+}
 function confirmBroadcastEmail(){
   if(!requireSession()) return;
   const subject=document.getElementById('broadcast-subject')?.value.trim()||'';
@@ -1730,7 +1768,7 @@ function showDashTab(tab,btn){
     document.getElementById('dash-'+t).style.display=t===tab?'block':'none';
   });
   if(tab==='security') renderSecurityLog();
-  if(tab==='settings') renderEmailTemplateSettings();
+  if(tab==='settings'){ renderEmailTemplateSettings(); loadInstructorNotifySettings(); }
 }
 
 /* ── MODAL ─────────────────────────────────────────────────────────────────── */

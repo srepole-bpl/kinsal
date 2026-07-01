@@ -4,6 +4,10 @@
 // signed with JWT_SECRET (server-only), so a browser cannot forge it. This is
 // the function that closes the catastrophic hole: previously these writes ran
 // as anon, gated only by a client-side `if`.
+import {
+  loadInstructorNotifySettings,
+  parseInstructorNotifyPayload,
+} from "../_shared/instructor-notify.ts";
 import { sendBroadcastEmails } from "../_shared/email.ts";
 import {
   loadAllEmailTemplates,
@@ -145,6 +149,31 @@ Deno.serve(async (req) => {
     });
     const templates = await loadAllEmailTemplates(db);
     return json({ success: true, templates });
+  }
+
+  if (action === "getInstructorNotifySettings") {
+    const notify = await loadInstructorNotifySettings(db);
+    return json({ success: true, ...notify });
+  }
+
+  if (action === "saveInstructorNotifySettings") {
+    const parsed = parseInstructorNotifyPayload(
+      body.instructor_email ?? body.instructorEmail,
+      body.instructor_slot_notify_enabled ?? body.instructorSlotNotifyEnabled,
+    );
+    if (!parsed.ok) return json({ success: false, error: parsed.error }, 400);
+
+    const { error } = await db.from("studio_settings").update({
+      instructor_email: parsed.instructor_email,
+      instructor_slot_notify_enabled: parsed.instructor_slot_notify_enabled,
+    }).eq("id", 1);
+    if (error) return json({ success: false, error: "could not save notify settings" }, 500);
+
+    await writeAudit(db, "instructor", "save_instructor_notify_settings", {
+      enabled: parsed.instructor_slot_notify_enabled,
+      has_email: !!parsed.instructor_email,
+    });
+    return json({ success: true, ...parsed });
   }
 
   if (action === "broadcastEmail") {
