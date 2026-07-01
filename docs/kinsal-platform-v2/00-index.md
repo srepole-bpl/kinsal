@@ -28,7 +28,7 @@
 | 5c. Audit + PIN | [05c-audit-pin.md](./05c-audit-pin.md) | ✅ Complete | `6c749f5` |
 | 6. Communications | [06-communications.md](./06-communications.md) | ✅ Complete | `6e6b3eb` |
 | 7. Polish + security | [07-polish-security.md](./07-polish-security.md) | ✅ Complete | `0739eef` |
-| 8. Instructor slot emails | [08-instructor-slot-notify.md](./08-instructor-slot-notify.md) | ✅ Complete | pending |
+| 8. Instructor slot emails | [08-instructor-slot-notify.md](./08-instructor-slot-notify.md) | ✅ Complete | `609d85b` |
 
 ## Status Legend
 
